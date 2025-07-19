@@ -1,0 +1,18 @@
+# Development overrides - automatically loaded by docker-compose
+
+services:
+  alpha-brain-mcp:
+    build:
+      dockerfile: Dockerfile
+    # For development, bind mount the source code
+    volumes:
+      - ./src:/app/src
+      - ./tests:/app/tests
+      - ./pyproject.toml:/app/pyproject.toml
+      # Mount host's Hugging Face cache to avoid re-downloading models
+      - ~/.cache/huggingface:/root/.cache/huggingface
+    # Enable more verbose logging in dev
+    environment:
+      LOG_LEVEL: DEBUG
+    # For development, we might want to see logs
+    command: ["--log-level", "DEBUG"]

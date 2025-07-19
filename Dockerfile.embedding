@@ -1,0 +1,40 @@
+# Embedding service Dockerfile
+FROM python:3.13-slim
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install uv for fast dependency management
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
+# Set up working directory
+WORKDIR /app
+
+# Install just the packages we need for embeddings
+RUN uv pip install --system --no-cache \
+    fastapi \
+    uvicorn \
+    sentence-transformers \
+    numpy \
+    pydantic \
+    httpx
+
+# Copy the embedding service code
+COPY src/embedding_service ./embedding_service
+
+# Pre-download models during build
+RUN python -c "from sentence_transformers import SentenceTransformer; \
+    model1 = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2'); \
+    model2 = SentenceTransformer('ng3owb/sentiment-embedding-model'); \
+    model1.encode('test'); \
+    model2.encode('test'); \
+    print('Models pre-downloaded successfully')"
+
+# Expose port
+EXPOSE 8001
+
+# Run the service
+CMD ["uvicorn", "embedding_service.app:app", "--host", "0.0.0.0", "--port", "8001"]

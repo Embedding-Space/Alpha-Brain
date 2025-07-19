@@ -1,0 +1,118 @@
+name: alpha-brain
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    container_name: alpha-brain-postgres
+    environment:
+      POSTGRES_USER: alpha
+      POSTGRES_PASSWORD: brain
+      POSTGRES_DB: alpha_brain
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - alpha-brain-network
+    # No exposed ports - only internal access
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U alpha -d alpha_brain"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  embedding-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.embedding
+    container_name: alpha-brain-embeddings
+    networks:
+      - alpha-brain-network
+    # No exposed ports - only internal access
+    volumes:
+      # Share model cache with host
+      - ~/.cache/huggingface:/root/.cache/huggingface
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  alpha-brain-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: alpha-brain-mcp
+    environment:
+      DATABASE_URL: postgresql://alpha:brain@postgres:5432/alpha_brain
+      OPENAI_BASE_URL: http://host.docker.internal:11434/v1
+      OPENAI_API_KEY: not-needed
+      EMBEDDING_SERVICE_URL: http://embedding-service:8001
+    ports:
+      - "9100:9100"  # Single exposed port for MCP HTTP
+    networks:
+      - alpha-brain-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      embedding-service:
+        condition: service_healthy
+    # Development bind mounts - comment out for production
+    volumes:
+      - ./src/alpha_brain:/app/alpha_brain:ro
+      - ./pyproject.toml:/app/pyproject.toml:ro
+      # Cache directories for models (default location)
+      - model_cache:/root/.cache
+    restart: unless-stopped
+
+  # Test containers - part of main stack but started separately
+  test-postgres:
+    image: pgvector/pgvector:pg17
+    container_name: alpha-brain-test-postgres
+    profiles: ["test"]  # Only starts when explicitly requested
+    environment:
+      POSTGRES_USER: alpha
+      POSTGRES_PASSWORD: brain
+      POSTGRES_DB: alpha_brain_test
+    networks:
+      - alpha-brain-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U alpha -d alpha_brain_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  test-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: alpha-brain-test-mcp
+    profiles: ["test"]  # Only starts when explicitly requested
+    environment:
+      DATABASE_URL: postgresql://alpha:brain@test-postgres:5432/alpha_brain_test
+      OPENAI_BASE_URL: http://host.docker.internal:11434/v1
+      OPENAI_API_KEY: not-needed
+      LOG_LEVEL: DEBUG
+      EMBEDDING_SERVICE_URL: http://embedding-service:8001  # Uses main embedder!
+    ports:
+      - "9101:9100"
+    networks:
+      - alpha-brain-network
+    depends_on:
+      test-postgres:
+        condition: service_healthy
+      embedding-service:
+        condition: service_healthy
+    volumes:
+      - ./src/alpha_brain:/app/alpha_brain:ro
+      - ./pyproject.toml:/app/pyproject.toml:ro
+      - model_cache:/root/.cache
+    restart: "no"
+
+volumes:
+  postgres_data:
+  model_cache:
+  # redis_data:
+
+networks:
+  alpha-brain-network:
+    driver: bridge
