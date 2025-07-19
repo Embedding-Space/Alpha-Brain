@@ -18,9 +18,9 @@ async def test_full_memory_lifecycle(mcp_client):
 
     # FastMCP client returns CallToolResult with content blocks
     # The prose is in the text content
-    assert hasattr(remember_result, 'content')
+    assert hasattr(remember_result, "content")
     assert len(remember_result.content) > 0
-    
+
     # Get the prose text from the content blocks
     prose_result = remember_result.content[0].text
     assert isinstance(prose_result, str)
@@ -100,4 +100,8 @@ async def test_memory_edge_cases(mcp_client):
         prose_result = typed_result.data
         assert isinstance(prose_result, str)
         # Should return results or "No memories found"
-        assert "Found" in prose_result or "No memories found" in prose_result or "memories matching" in prose_result
+        assert (
+            "Found" in prose_result
+            or "No memories found" in prose_result
+            or "memories matching" in prose_result
+        )

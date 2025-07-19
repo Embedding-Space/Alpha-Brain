@@ -52,7 +52,7 @@ class MemoryService:
             # Generate embeddings first
             logger.info("Generating embeddings", content_preview=content[:100])
             semantic_emb, emotional_emb = await self.embedding_service.embed(content)
-            
+
             # Then extract entities (optional, can fail gracefully)
             entities = await self._extract_entities_safe(content)
 
@@ -92,87 +92,104 @@ class MemoryService:
         self, query: str, search_type: str = "semantic", limit: int = 10
     ) -> list[MemoryOutput]:
         """
-        Search memories using vector similarity.
+        Search memories using vector similarity or exact text match.
 
         Args:
             query: The search query
-            search_type: 'semantic', 'emotional', or 'both'
+            search_type: 'semantic', 'emotional', 'both', or 'exact'
             limit: Maximum results to return
 
         Returns:
             List of matching memories with similarity scores
         """
         try:
-            # Generate query embeddings
-            semantic_emb, emotional_emb = await self.embedding_service.embed(query)
-
             async with get_db() as session:
-                if search_type == "semantic":
-                    # Semantic search using SQLAlchemy Vector distance methods
-                    # pgvector provides cosine_distance method on Vector columns
+                if search_type == "exact":
+                    # Exact text search using ILIKE
                     stmt = (
                         select(
                             Memory.id,
                             Memory.content,
                             Memory.created_at,
                             Memory.extra_data,
-                            Memory.semantic_embedding.cosine_distance(
-                                semantic_emb.tolist()
-                            ).label("distance"),
                         )
-                        .where(Memory.semantic_embedding.is_not(None))
-                        .order_by(
-                            Memory.semantic_embedding.cosine_distance(
-                                semantic_emb.tolist()
+                        .where(Memory.content.ilike(f"%{query}%"))
+                        .order_by(Memory.created_at.desc())
+                        .limit(limit)
+                    )
+
+                else:
+                    # Vector similarity search - need embeddings
+                    semantic_emb, emotional_emb = await self.embedding_service.embed(
+                        query
+                    )
+
+                    if search_type == "semantic":
+                        # Semantic search using SQLAlchemy Vector distance methods
+                        # pgvector provides cosine_distance method on Vector columns
+                        stmt = (
+                            select(
+                                Memory.id,
+                                Memory.content,
+                                Memory.created_at,
+                                Memory.extra_data,
+                                Memory.semantic_embedding.cosine_distance(
+                                    semantic_emb.tolist()
+                                ).label("distance"),
                             )
-                        )
-                        .limit(limit)
-                    )
-
-                elif search_type == "emotional":
-                    # Emotional search using SQLAlchemy Vector distance methods
-                    stmt = (
-                        select(
-                            Memory.id,
-                            Memory.content,
-                            Memory.created_at,
-                            Memory.extra_data,
-                            Memory.emotional_embedding.cosine_distance(
-                                emotional_emb.tolist()
-                            ).label("distance"),
-                        )
-                        .where(Memory.emotional_embedding.is_not(None))
-                        .order_by(
-                            Memory.emotional_embedding.cosine_distance(
-                                emotional_emb.tolist()
+                            .where(Memory.semantic_embedding.is_not(None))
+                            .order_by(
+                                Memory.semantic_embedding.cosine_distance(
+                                    semantic_emb.tolist()
+                                )
                             )
+                            .limit(limit)
                         )
-                        .limit(limit)
-                    )
 
-                else:  # "both" or default
-                    # Combined search - average of both distances
-                    semantic_dist = Memory.semantic_embedding.cosine_distance(
-                        semantic_emb.tolist()
-                    )
-                    emotional_dist = Memory.emotional_embedding.cosine_distance(
-                        emotional_emb.tolist()
-                    )
-                    avg_distance = (semantic_dist + emotional_dist) / 2
-
-                    stmt = (
-                        select(
-                            Memory.id,
-                            Memory.content,
-                            Memory.created_at,
-                            Memory.extra_data,
-                            avg_distance.label("distance"),
+                    elif search_type == "emotional":
+                        # Emotional search using SQLAlchemy Vector distance methods
+                        stmt = (
+                            select(
+                                Memory.id,
+                                Memory.content,
+                                Memory.created_at,
+                                Memory.extra_data,
+                                Memory.emotional_embedding.cosine_distance(
+                                    emotional_emb.tolist()
+                                ).label("distance"),
+                            )
+                            .where(Memory.emotional_embedding.is_not(None))
+                            .order_by(
+                                Memory.emotional_embedding.cosine_distance(
+                                    emotional_emb.tolist()
+                                )
+                            )
+                            .limit(limit)
                         )
-                        .where(Memory.semantic_embedding.is_not(None))
-                        .where(Memory.emotional_embedding.is_not(None))
-                        .order_by(avg_distance)
-                        .limit(limit)
-                    )
+
+                    else:  # "both" or default
+                        # Combined search - average of both distances
+                        semantic_dist = Memory.semantic_embedding.cosine_distance(
+                            semantic_emb.tolist()
+                        )
+                        emotional_dist = Memory.emotional_embedding.cosine_distance(
+                            emotional_emb.tolist()
+                        )
+                        avg_distance = (semantic_dist + emotional_dist) / 2
+
+                        stmt = (
+                            select(
+                                Memory.id,
+                                Memory.content,
+                                Memory.created_at,
+                                Memory.extra_data,
+                                avg_distance.label("distance"),
+                            )
+                            .where(Memory.semantic_embedding.is_not(None))
+                            .where(Memory.emotional_embedding.is_not(None))
+                            .order_by(avg_distance)
+                            .limit(limit)
+                        )
 
                 result = await session.execute(stmt)
                 rows = result.fetchall()
@@ -184,8 +201,13 @@ class MemoryService:
                     created_at = pendulum.instance(row.created_at)
                     age = created_at.diff_for_humans()
 
-                    # Convert distance to similarity (1 - distance for cosine)
-                    similarity_score = 1.0 - float(row.distance)
+                    # Calculate similarity score
+                    if search_type == "exact":
+                        # For exact search, we don't have a distance/similarity score
+                        similarity_score = None
+                    else:
+                        # Convert distance to similarity (1 - distance for cosine)
+                        similarity_score = 1.0 - float(row.distance)
 
                     memory_output = MemoryOutput(
                         id=row.id,

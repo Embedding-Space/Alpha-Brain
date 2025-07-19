@@ -26,7 +26,7 @@ async def remember(
     raw: bool = False,
 ) -> None:
     """Store a memory in Alpha Brain.
-    
+
     Args:
         content: The content to remember
         server: MCP server URL
@@ -35,7 +35,7 @@ async def remember(
     try:
         async with Client(server) as client:
             result = await client.call_tool("remember", {"content": content})
-            
+
             if raw:
                 # Show the raw CallToolResult structure
                 console.print(f"CallToolResult: {result}")
@@ -51,7 +51,7 @@ async def remember(
                 console.print("[red]Error storing memory[/red]", style="bold red")
             else:
                 console.print("[yellow]No content returned[/yellow]")
-                    
+
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]", style="bold red")
         sys.exit(1)
@@ -66,7 +66,7 @@ async def search(
     raw: bool = False,
 ) -> None:
     """Search memories and knowledge in Alpha Brain.
-    
+
     Args:
         query: Search query
         search_type: Type of search (semantic, emotional, both)
@@ -77,10 +77,9 @@ async def search(
     try:
         async with Client(server) as client:
             result = await client.call_tool(
-                "search", 
-                {"query": query, "search_type": search_type, "limit": limit}
+                "search", {"query": query, "search_type": search_type, "limit": limit}
             )
-            
+
             if raw:
                 # Show the raw CallToolResult structure
                 console.print(f"CallToolResult: {result}")
@@ -96,7 +95,7 @@ async def search(
                 console.print("[red]Error searching memories[/red]", style="bold red")
             else:
                 console.print("[yellow]No results found[/yellow]")
-                    
+
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]", style="bold red")
         sys.exit(1)
@@ -108,7 +107,7 @@ async def health(
     raw: bool = False,
 ) -> None:
     """Check health of the Alpha Brain server.
-    
+
     Args:
         server: MCP server URL
         raw: Show raw output without formatting
@@ -116,7 +115,7 @@ async def health(
     try:
         async with Client(server) as client:
             result = await client.call_tool("health_check", {})
-            
+
             if raw:
                 # Show the raw CallToolResult structure
                 console.print(f"CallToolResult: {result}")
@@ -130,11 +129,7 @@ async def health(
                 # If it's JSON, pretty print it
                 try:
                     data = json.loads(text)
-                    syntax = Syntax(
-                        json.dumps(data, indent=2), 
-                        "json", 
-                        theme="monokai"
-                    )
+                    syntax = Syntax(json.dumps(data, indent=2), "json", theme="monokai")
                     console.print(syntax)
                 except json.JSONDecodeError:
                     # Not JSON, just print as text
@@ -143,7 +138,7 @@ async def health(
                 console.print("[red]Server health check failed[/red]", style="bold red")
             else:
                 console.print("[green]Server is healthy[/green]")
-                    
+
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]", style="bold red")
         sys.exit(1)
@@ -154,16 +149,16 @@ async def tools(
     server: str = DEFAULT_MCP_URL,
 ) -> None:
     """List available tools on the MCP server.
-    
+
     Args:
         server: MCP server URL
     """
     try:
         async with Client(server) as client:
             tools = await client.list_tools()
-            
+
             console.print(f"\n[bold]Available tools on {server}:[/bold]\n")
-            
+
             for tool in tools:
                 console.print(f"[cyan]{tool.name}[/cyan]")
                 if tool.description:
@@ -171,7 +166,7 @@ async def tools(
                 if tool.inputSchema:
                     console.print(f"  Schema: {json.dumps(tool.inputSchema, indent=4)}")
                 console.print()
-                
+
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]", style="bold red")
         sys.exit(1)

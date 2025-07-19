@@ -9,7 +9,7 @@ async def search(query: str, search_type: str = "semantic", limit: int = 10) -> 
 
     Args:
         query: The search query
-        search_type: Type of search - 'semantic', 'emotional', 'both'
+        search_type: Type of search - 'semantic', 'emotional', 'both', or 'exact'
         limit: Maximum number of results (default 10)
 
     Returns:
@@ -24,9 +24,13 @@ async def search(query: str, search_type: str = "semantic", limit: int = 10) -> 
     # Build a prose response
     results = []
     for mem in memories:
-        similarity_pct = f"{mem.similarity_score * 100:.1f}%"
+        if mem.similarity_score is not None:
+            score_text = f" (similarity: {mem.similarity_score * 100:.1f}%)"
+        else:
+            score_text = ""  # No score for exact matches
+
         results.append(
-            f"• {mem.age} (similarity: {similarity_pct}): {mem.content[:200]}"
+            f"• {mem.age}{score_text}: {mem.content[:200]}"
             + ("..." if len(mem.content) > 200 else "")
         )
 

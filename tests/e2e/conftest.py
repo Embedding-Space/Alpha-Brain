@@ -1,6 +1,7 @@
 """Shared fixtures for E2E tests."""
 
 import os
+
 import pytest
 from fastmcp import Client
 

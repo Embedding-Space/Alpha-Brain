@@ -58,7 +58,7 @@ services:
         condition: service_healthy
     # Development bind mounts - comment out for production
     volumes:
-      - ./src/alpha_brain:/app/alpha_brain:ro
+      - ./src/alpha_brain:/app/src/alpha_brain:ro
       - ./pyproject.toml:/app/pyproject.toml:ro
       # Cache directories for models (default location)
       - model_cache:/root/.cache
@@ -103,7 +103,7 @@ services:
       embedding-service:
         condition: service_healthy
     volumes:
-      - ./src/alpha_brain:/app/alpha_brain:ro
+      - ./src/alpha_brain:/app/src/alpha_brain:ro
       - ./pyproject.toml:/app/pyproject.toml:ro
       - model_cache:/root/.cache
     restart: "no"

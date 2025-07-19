@@ -19,15 +19,15 @@ async def lifespan(app):
     from alpha_brain.embeddings import get_embedding_service
 
     await init_db()
-    
+
     # Initialize embedding service
     logger.info("Initializing embedding service...")
     embedding_service = get_embedding_service()
-    
+
     # Wait for embedding service to be ready
     logger.info("Waiting for embedding service to be ready...")
     await embedding_service.client.wait_until_ready()
-    
+
     # Warm up the embedding models with a test embedding
     logger.info("Warming up embedding models...")
     try:
@@ -35,7 +35,7 @@ async def lifespan(app):
         logger.info("Embedding models warmed up successfully")
     except Exception as e:
         logger.warning("Failed to warm up embedding models", error=str(e))
-    
+
     logger.info("Server ready!")
 
     yield

@@ -16,11 +16,11 @@ async def test_server_is_healthy(mcp_client):
     # The result is now prose, wrapped in CallToolResult
     prose_result = result.data
     assert isinstance(prose_result, str)
-    
+
     # Check the response contains expected content
     assert "Alpha Brain (v1.0.0)" in prose_result
     assert "healthy" in prose_result or "partially operational" in prose_result
-    
+
     # If everything is healthy, we should see this message
     if "healthy" in prose_result and "partially" not in prose_result:
         assert "All systems operational" in prose_result

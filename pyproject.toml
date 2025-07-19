@@ -26,6 +26,7 @@ dependencies = [
     "cyclopts>=3.0.0",
     "rich>=13.0.0",
     "fastapi>=0.116.1",
+    "greenlet>=3.2.3",
 ]
 
 [project.scripts]

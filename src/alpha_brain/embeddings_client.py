@@ -45,11 +45,11 @@ class EmbeddingServiceClient:
                 timeout=30.0,
             )
             response.raise_for_status()
-            
+
             data = response.json()
             semantic = np.array(data["semantic"])
             emotional = np.array(data["emotional"])
-            
+
             return semantic, emotional
 
     async def embed_batch(self, texts: list[str]) -> tuple[np.ndarray, np.ndarray]:
@@ -73,11 +73,11 @@ class EmbeddingServiceClient:
                 timeout=60.0,  # Longer timeout for batch
             )
             response.raise_for_status()
-            
+
             data = response.json()
             semantic = np.array(data["semantic"])
             emotional = np.array(data["emotional"])
-            
+
             return semantic, emotional
 
     async def wait_until_ready(self, max_attempts: int = 30):
@@ -90,10 +90,10 @@ class EmbeddingServiceClient:
                     return
             except Exception:
                 pass
-            
+
             if attempt < max_attempts - 1:
                 await asyncio.sleep(1)
-        
+
         raise RuntimeError("Embedding service failed to become ready")
 
 

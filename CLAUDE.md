@@ -29,11 +29,18 @@ Alpha Brain embraces the principle that **models write JSON and read prose**:
 
 ```bash
 # Development workflow
-just up          # Start everything (Postgres + MCP server)
+just up          # Start everything (Postgres + embeddings + MCP server)
 just restart     # Restart MCP server after code changes (bind mounts make this fast)
 just logs -f     # Follow MCP server logs
-just test        # Run E2E tests against running stack
+just dev         # Restart + follow logs (common workflow)
 just psql        # Connect to Postgres for debugging
+
+# Testing
+just test-up     # Start test containers (separate from main stack)
+just test        # Run E2E tests against test containers
+just test-one <test>  # Run single test (e.g., just test-one test_exact_search.py)
+just test-down   # Stop test containers
+just test-logs   # View test container logs
 
 # Python execution (use uv, not bare python)
 uv run python script.py    # ✅ Correct - picks up virtual environment
@@ -43,14 +50,15 @@ python script.py          # ❌ Wrong - won't find dependencies
 just lint        # Check code style with Ruff
 just fix         # Auto-fix style issues
 just dead        # Find unused code with Vulture
+just check       # Run ALL checks before committing (lint + dead + test)
 
 # Database operations
 just backup      # Creates timestamped .tar.gz with all data
 just restore <file>  # Restore from backup
 
-# Development shortcuts
-just dev         # Restart + follow logs (common workflow)
-just test-one <test>  # Run single test with output
+# Cleanup
+just clean       # Remove containers and volumes
+just clean-cache # Clean Python cache files
 ```
 
 ## Architecture Decisions
@@ -62,8 +70,8 @@ just test-one <test>  # Run single test with output
 - This avoids the "working on server while talking to server" pain
 
 ### Package Structure
-- `src/alpha_brain/` at root, but Docker copies to `/app/alpha_brain/`
-- This simplified structure fixed module import issues
+- `src/alpha_brain/` at root, Docker copies to `/app/src/alpha_brain/`
+- **Important**: Bind mounts must match Docker structure (see Docker section below)
 - Tools are in `tools/` subdirectory for clean separation
 
 ### Memory Pipeline
@@ -80,9 +88,11 @@ just test-one <test>  # Run single test with output
 
 ### Key Technical Choices
 - **FastMCP 2**: HTTP transport (not stdio) to avoid model instance proliferation
-- **Postgres + pgvector**: Vector similarity search with `<=>` operator
-- **Sentence-transformers**: Local embeddings (all-MiniLM-L6-v2 + sentiment model)
-- **PydanticAI + Ollama**: Local entity extraction
+- **Postgres + pgvector**: Vector similarity search with cosine distance
+- **Sentence-transformers**: 
+  - Semantic: all-mpnet-base-v2 (768D) - better quality than MiniLM
+  - Emotional: ng3owb/sentiment-embedding-model (1024D)
+- **PydanticAI + Ollama**: Local entity extraction with Llama 3.2
 - **Pydantic Settings**: Environment validation (DATABASE_URL required)
 
 ## Current Implementation State
@@ -90,8 +100,9 @@ just test-one <test>  # Run single test with output
 ### What Works
 - Memory ingestion with dual embeddings
 - Vector similarity search (semantic, emotional, or both)
+- **Exact text search** (case-insensitive ILIKE matching)
 - Entity extraction via local Llama 3.2
-- E2E test infrastructure
+- E2E test infrastructure with separate test containers
 - Backup/restore workflow
 
 ### What's Next (TODOs)
@@ -120,15 +131,18 @@ memories = await service.search(query, search_type="semantic")
 ```
 
 ### Testing Pattern
-- E2E tests use FastMCP client against running Docker stack
-- No unit tests yet (E2E more valuable for MCP servers)
-- Tests must wait for stack to be healthy before running
+- E2E tests use FastMCP client against separate test containers
+- Test containers share embedding service but have isolated database
+- Tests automatically wait for healthy containers via `wait_for_mcp.py`
+- Run tests with `just test` or single test with `just test-one <file>`
 
 ## Gotchas and Solutions
 
-### Module Import Errors in Docker
-- Fixed by copying `alpha_brain` directly (not nested in src/)
-- Dockerfile handles this correctly now
+### Docker Bind Mount Paths
+- **Critical**: Bind mounts must match where Dockerfile copies files
+- Dockerfile: `COPY src ./src` puts files at `/app/src/alpha_brain/`
+- Bind mount: `./src/alpha_brain:/app/src/alpha_brain:ro`
+- If these don't match, containers use stale code (common gotcha!)
 
 ### Ollama Connection
 - Uses `host.docker.internal:11434` from inside Docker
@@ -174,3 +188,11 @@ If `just check` fails:
 2. Address any remaining issues manually
 3. Run `just check` again
 4. When it passes, commit
+
+### Writing Good Commit Messages
+- Use conventional commits: `feat:`, `fix:`, `docs:`, etc.
+- Reference what changed and why, not just what
+- For AI pair programming, include co-authorship:
+  ```
+  Co-Authored-By: Alpha <jeffery.harrell+alpha@gmail.com>
+  ```
