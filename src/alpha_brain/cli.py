@@ -1,5 +1,13 @@
 #!/usr/bin/env python
-"""Command-line interface for Alpha Brain."""
+"""Command-line interface for Alpha Brain.
+
+Note: This CLI is primarily for testing and debugging. When using shell commands,
+special characters may need escaping due to shell interpretation. For example:
+- Use single quotes to avoid escaping: uv run alpha-brain remember 'Hello!'
+- Or escape special characters: uv run alpha-brain remember "Hello\!"
+
+Production usage should be through MCP tools where shell escaping is not an issue.
+"""
 
 import json
 import sys
@@ -167,6 +175,34 @@ async def tools(
                     console.print(f"  Schema: {json.dumps(tool.inputSchema, indent=4)}")
                 console.print()
 
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]", style="bold red")
+        sys.exit(1)
+
+
+@app.command(name="get-memory")
+async def get_memory_cmd(
+    memory_id: str,
+    server: str = DEFAULT_MCP_URL,
+) -> None:
+    """Get a complete memory by its ID.
+    
+    Args:
+        memory_id: The UUID of the memory to retrieve
+        server: MCP server URL
+    """
+    try:
+        async with Client(server) as client:
+            result = await client.call_tool("get_memory", {"memory_id": memory_id})
+            
+            if result.content and len(result.content) > 0:
+                text = result.content[0].text
+                console.print(text)
+            elif result.is_error:
+                console.print("[red]Failed to get memory[/red]", style="bold red")
+            else:
+                console.print("[yellow]No content returned[/yellow]")
+    
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]", style="bold red")
         sys.exit(1)

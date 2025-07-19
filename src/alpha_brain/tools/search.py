@@ -30,7 +30,7 @@ async def search(query: str, search_type: str = "semantic", limit: int = 10) -> 
             score_text = ""  # No score for exact matches
 
         results.append(
-            f"• {mem.age}{score_text}: {mem.content[:200]}"
+            f"• {mem.age}{score_text} [ID: {mem.id}]: {mem.content[:200]}"
             + ("..." if len(mem.content) > 200 else "")
         )
 

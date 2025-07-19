@@ -2,6 +2,7 @@
 
 import uuid
 from typing import Any
+from uuid import UUID
 
 import pendulum
 from sqlalchemy import select
@@ -263,6 +264,47 @@ class MemoryService:
         except Exception as e:
             logger.error("Search failed", error=str(e))
             return []
+
+    async def get_by_id(self, memory_id: UUID) -> MemoryOutput | None:
+        """
+        Get a specific memory by its ID.
+        
+        Args:
+            memory_id: The UUID of the memory
+            
+        Returns:
+            MemoryOutput if found, None otherwise
+        """
+        try:
+            async with get_db() as session:
+                stmt = select(
+                    Memory.id,
+                    Memory.content,
+                    Memory.created_at,
+                    Memory.extra_data,
+                ).where(Memory.id == memory_id)
+                
+                result = await session.execute(stmt)
+                row = result.fetchone()
+                
+                if not row:
+                    return None
+                
+                # Calculate age
+                created_at = pendulum.instance(row.created_at)
+                age = created_at.diff_for_humans()
+                
+                return MemoryOutput(
+                    id=row.id,
+                    content=row.content,
+                    created_at=row.created_at,
+                    extra_data=row.extra_data or {},
+                    age=age,
+                )
+                
+        except Exception as e:
+            logger.error("Failed to get memory by ID", memory_id=str(memory_id), error=str(e))
+            return None
 
 
 # Global instance

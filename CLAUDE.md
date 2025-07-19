@@ -63,6 +63,14 @@ just clean-cache # Clean Python cache files
 
 ## Architecture Decisions
 
+### No Backward Compatibility (Greenfield Development)
+- **This is a greenfield project** - there is no "backward" to be compatible with
+- **Eschew all backward compatibility** until we're actually in production
+- **No cruft allowed** - remove old fields, patterns, and code without hesitation
+- **Data can be dropped** - we can wipe the volume and start fresh anytime
+- **Clean over compatible** - prefer clean design over maintaining old interfaces
+- Example: We removed the `entities` field in favor of rich `extra_data` - no compatibility layer needed
+
 ### Docker-First Development
 - Everything runs in Docker Compose
 - Single exposed port (9100) for MCP HTTP server

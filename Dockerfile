@@ -18,8 +18,8 @@ WORKDIR /app
 COPY pyproject.toml uv.lock README.md ./
 COPY src ./src
 
-# Install the package and all dependencies
-RUN uv pip install --system --no-cache .
+# Install in editable mode so bind mounts work properly
+RUN uv pip install --system --no-cache -e .
 
 # Expose MCP HTTP port
 EXPOSE 9100

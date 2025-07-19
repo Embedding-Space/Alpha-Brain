@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from fastmcp import FastMCP
 from structlog import get_logger
 
-from alpha_brain.tools import health_check, remember, search
+from alpha_brain.tools import get_memory, health_check, remember, search
 
 logger = get_logger()
 
@@ -67,6 +67,7 @@ mcp = FastMCP(
 mcp.tool(health_check)
 mcp.tool(remember)
 mcp.tool(search)
+mcp.tool(get_memory)
 
 
 if __name__ == "__main__":

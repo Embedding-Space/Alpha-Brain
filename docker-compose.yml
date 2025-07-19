@@ -1,5 +1,8 @@
 name: alpha-brain
 
+x-shared-env: &shared-env
+  HELPER_MODEL: gemma3:4b
+
 services:
   postgres:
     image: pgvector/pgvector:pg17
@@ -43,6 +46,7 @@ services:
       dockerfile: Dockerfile
     container_name: alpha-brain-mcp
     environment:
+      <<: *shared-env
       DATABASE_URL: postgresql://alpha:brain@postgres:5432/alpha_brain
       OPENAI_BASE_URL: http://host.docker.internal:11434/v1
       OPENAI_API_KEY: not-needed
@@ -88,6 +92,7 @@ services:
     container_name: alpha-brain-test-mcp
     profiles: ["test"]  # Only starts when explicitly requested
     environment:
+      <<: *shared-env
       DATABASE_URL: postgresql://alpha:brain@test-postgres:5432/alpha_brain_test
       OPENAI_BASE_URL: http://host.docker.internal:11434/v1
       OPENAI_API_KEY: not-needed
