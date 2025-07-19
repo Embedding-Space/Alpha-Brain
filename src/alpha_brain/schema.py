@@ -33,11 +33,8 @@ class Memory(Base):
         Vector(1024)
     )  # ng3owb/sentiment-embedding-model dimensions
 
-    # Extra data - flexible JSON field for future expansion
+    # Extra data - flexible JSON field for metadata and future expansion
     extra_data = Column(JSON, default={})
-
-    # Optional: extracted entities (can be None if we skip extraction)
-    entities = Column(JSON)  # List of entity names mentioned
 
     # For future TTL support if we want ephemeral memories
     expires_at = Column(DateTime, nullable=True)

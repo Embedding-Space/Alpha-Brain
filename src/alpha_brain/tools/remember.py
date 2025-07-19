@@ -14,20 +14,22 @@ async def remember(content: str) -> str:
     logger.info("remember_tool_got_result", result=result)
 
     if result["status"] == "stored":
-        entities_text = ""
-        if result.get("entities"):
-            entities_text = (
-                f" I noticed references to: {', '.join(result['entities'])}."
-            )
-
         preview = result["preview"]
         if len(preview) > 100:
             preview = preview[:100] + "..."
 
+        # Build a more informative response using metadata
+        metadata = result.get("metadata", {})
+        summary = metadata.get("summary", "")
+
         prose_result = (
             f'Stored memory: "{preview}"\n\n'
-            f"Created at {result['timestamp']} (ID: {result['memory_id']}).{entities_text}"
+            f"Created at {result['timestamp']} (ID: {result['memory_id']})."
         )
+
+        if summary:
+            prose_result += f"\n\nSummary: {summary}"
+
         logger.info("remember_tool_returning_prose", prose=prose_result)
         return prose_result
 

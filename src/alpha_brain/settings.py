@@ -31,8 +31,8 @@ class Settings(BaseSettings):
     )
 
     # Model settings
-    ollama_model: str = Field(
-        default="llama3.2:3b", description="Ollama model to use for entity extraction"
+    helper_model: str = Field(
+        description="Model to use for entity extraction (e.g., llama3.2:3b, gpt-4o)"
     )
 
     # Server settings

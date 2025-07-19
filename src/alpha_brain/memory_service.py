@@ -23,17 +23,41 @@ class MemoryService:
         self.embedding_service = embedding_service or get_embedding_service()
         self.memory_helper = memory_helper or MemoryHelper()
 
-    async def _extract_entities_safe(self, content: str) -> list[str]:
-        """Extract entities with error handling, returns empty list on failure."""
+    async def _analyze_memory_safe(self, content: str) -> dict[str, Any]:
+        """Analyze memory with error handling, returns minimal metadata on failure."""
         try:
-            logger.info("Extracting entities")
-            extraction_result = await self.memory_helper.extract_entities(content)
-            entities = extraction_result.entities
-            logger.info("Extracted entities", entities=entities)
-            return entities
+            logger.info("Analyzing memory")
+            metadata = await self.memory_helper.analyze_memory(content)
+
+            # Convert to dict for storage
+            metadata_dict = {
+                "people": metadata.people,
+                "technologies": metadata.technologies,
+                "organizations": metadata.organizations,
+                "places": metadata.places,
+                "emotional_tone": metadata.emotional_tone,
+                "importance": metadata.importance,
+                "keywords": metadata.keywords,
+                "summary": metadata.summary,
+                "analyzed_at": pendulum.now("UTC").isoformat(),
+            }
+
+            logger.info(
+                "Memory analyzed",
+                people_count=len(metadata.people),
+                tech_count=len(metadata.technologies),
+                importance=metadata.importance,
+                tone=metadata.emotional_tone,
+            )
+            return metadata_dict
         except Exception as e:
-            logger.warning("Entity extraction failed", error=str(e))
-            return []
+            logger.warning("Memory analysis failed", error=str(e))
+            # Return minimal metadata
+            return {
+                "summary": content[:100] + "..." if len(content) > 100 else content,
+                "importance": 3,
+                "analyzed_at": pendulum.now("UTC").isoformat(),
+            }
 
     async def remember(
         self, content: str, extra_data: dict[str, Any] | None = None
@@ -53,8 +77,11 @@ class MemoryService:
             logger.info("Generating embeddings", content_preview=content[:100])
             semantic_emb, emotional_emb = await self.embedding_service.embed(content)
 
-            # Then extract entities (optional, can fail gracefully)
-            entities = await self._extract_entities_safe(content)
+            # Then analyze the memory (optional, can fail gracefully)
+            metadata = await self._analyze_memory_safe(content)
+
+            # Merge provided extra_data with our metadata
+            combined_extra_data = {**(extra_data or {}), **metadata}
 
             async with get_db() as session:
                 memory = Memory(
@@ -63,8 +90,7 @@ class MemoryService:
                     created_at=pendulum.now("UTC"),
                     semantic_embedding=semantic_emb.tolist(),
                     emotional_embedding=emotional_emb.tolist(),
-                    entities=entities,
-                    extra_data=extra_data or {},
+                    extra_data=combined_extra_data,
                 )
 
                 session.add(memory)
@@ -76,8 +102,13 @@ class MemoryService:
                     "status": "stored",
                     "memory_id": str(memory.id),
                     "preview": content[:200] + "..." if len(content) > 200 else content,
-                    "entities": entities,
                     "timestamp": memory.created_at.isoformat(),
+                    "metadata": {
+                        "summary": metadata.get("summary", ""),
+                        "importance": metadata.get("importance", 3),
+                        "emotional_tone": metadata.get("emotional_tone", "neutral"),
+                        "keywords": metadata.get("keywords", []),
+                    },
                 }
 
         except Exception as e:
