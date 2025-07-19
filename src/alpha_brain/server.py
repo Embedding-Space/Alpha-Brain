@@ -5,7 +5,16 @@ from contextlib import asynccontextmanager
 from fastmcp import FastMCP
 from structlog import get_logger
 
-from alpha_brain.tools import get_memory, health_check, remember, search
+from alpha_brain.tools import (
+    create_knowledge,
+    get_knowledge,
+    get_memory,
+    health_check,
+    list_knowledge,
+    remember,
+    search,
+    update_knowledge,
+)
 
 logger = get_logger()
 
@@ -53,12 +62,20 @@ mcp = FastMCP(
     instructions="""
     A unified memory and knowledge system for AI agents.
     
-    Use remember() to store memories as natural language prose.
-    Use search() to find memories and knowledge using various search strategies.
+    Memory Tools:
+    - remember() to store memories as natural language prose
+    - search() to find memories using semantic/emotional search
+    - get_memory() to retrieve a specific memory by ID
+    
+    Knowledge Tools:
+    - create_knowledge() to create structured documents from Markdown
+    - get_knowledge() to retrieve documents by slug
+    - update_knowledge() to modify existing documents
+    - list_knowledge() to see all available documents
     
     This system combines:
     - Diary Brain: Experiential memories with emotional context
-    - Encyclopedia Brain: Crystallized knowledge and technical patterns
+    - Encyclopedia Brain: Structured knowledge documents with sections
     """,
     lifespan=lifespan,
 )
@@ -68,6 +85,10 @@ mcp.tool(health_check)
 mcp.tool(remember)
 mcp.tool(search)
 mcp.tool(get_memory)
+mcp.tool(create_knowledge)
+mcp.tool(get_knowledge)
+mcp.tool(update_knowledge)
+mcp.tool(list_knowledge)
 
 
 if __name__ == "__main__":

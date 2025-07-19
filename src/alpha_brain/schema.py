@@ -6,7 +6,7 @@ from uuid import UUID, uuid4
 
 from pgvector.sqlalchemy import Vector
 from pydantic import BaseModel, Field
-from sqlalchemy import JSON, Column, DateTime, Text
+from sqlalchemy import JSON, Column, DateTime, String, Text
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import declarative_base
 
@@ -87,3 +87,42 @@ class NaturalAnswer(BaseModel):
     reasoning: str | None = Field(
         None, description="Optional explanation of how the answer was derived"
     )
+
+
+class Knowledge(Base):
+    """Structured knowledge document stored as parsed Markdown."""
+    
+    __tablename__ = "knowledge"
+    
+    # Core identity
+    id = Column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    slug = Column(String, nullable=False, unique=True, index=True)
+    
+    # Document content
+    title = Column(String, nullable=False)
+    content = Column(Text, nullable=False)  # Raw Markdown
+    structure = Column(JSON, nullable=False)  # Parsed structure
+    
+    # Timestamps
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class KnowledgeInput(BaseModel):
+    """Input model for creating/updating knowledge."""
+    
+    slug: str = Field(..., description="URL-friendly identifier")
+    title: str = Field(..., description="Document title")
+    content: str = Field(..., description="Markdown content")
+
+
+class KnowledgeOutput(BaseModel):
+    """Output model for retrieved knowledge."""
+    
+    id: UUID
+    slug: str
+    title: str
+    content: str
+    structure: dict[str, Any]
+    created_at: datetime
+    updated_at: datetime

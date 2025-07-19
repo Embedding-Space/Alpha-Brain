@@ -28,6 +28,7 @@ dependencies = [
     "fastapi>=0.116.1",
     "greenlet>=3.2.3",
     "redis>=6.2.0",
+    "mistune>=3.0.0",
 ]
 
 [project.scripts]
