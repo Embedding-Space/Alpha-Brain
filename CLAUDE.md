@@ -23,6 +23,15 @@ Alpha Brain embraces the principle that **models write JSON and read prose**:
 - Example: `"Found memory from 23 minutes ago (similarity: 0.46): 'The cat sat on the mat.'"`
 - This aligns with the prose-first philosophy and makes tools more conversational
 
+### Entity Canonicalization
+
+The system maintains canonical entity names with aliases for consistent resolution:
+
+- **PostgreSQL arrays with GIN indexing** for efficient alias lookups
+- **Helper** (Llama 3.2) extracts entity names from prose and canonicalizes them
+- **Marginalia** field stores Helper's analysis including entities, keywords, and summaries
+- Example: "Jeff" → "Jeffery Harrell", "Sparkle" → "Sparkplug Louise Mittenhaver"
+
 ## Essential Commands
 
 **Important**: This project uses `uv` for package management. Always use `uv run python` instead of `python` or `python3`.
@@ -84,9 +93,10 @@ just clean-cache # Clean Python cache files
 
 ### Memory Pipeline
 1. Prose input → Dual embeddings (semantic + emotional)
-2. Optional entity extraction with Llama 3.2 (can fail gracefully)
-3. Store in Postgres with pgvector
+2. Entity extraction and canonicalization via Helper (Llama 3.2)
+3. Store in Postgres with pgvector, including marginalia metadata
 4. Search returns memories with similarity scores and human-readable age
+5. Splash Engine provides associative memory resonance for serendipitous discovery
 
 ### Knowledge Pipeline (Implemented)
 1. Write knowledge naturally in Markdown
@@ -100,29 +110,31 @@ just clean-cache # Clean Python cache files
 - **Postgres + pgvector**: Vector similarity search with cosine distance
 - **Sentence-transformers**: 
   - Semantic: all-mpnet-base-v2 (768D) - better quality than MiniLM
-  - Emotional: ng3owb/sentiment-embedding-model (1024D)
-- **PydanticAI + Ollama**: Local entity extraction with Llama 3.2
+  - Emotional: ng3owb/sentiment-embedding-model (7D categorical)
+- **PydanticAI + Ollama**: Local entity extraction with configurable model (defaults to gemma3:4b)
 - **Pydantic Settings**: Environment validation (DATABASE_URL required)
+- **One-time service initialization**: Database and embedding services persist across MCP connections
 
 ## Current Implementation State
 
 ### What Works
-- Memory ingestion with dual embeddings
-- Vector similarity search (semantic, emotional, or both)
+- Memory ingestion with dual embeddings and marginalia
+- Vector similarity search (semantic, emotional, or both) with Splash Engine
 - **Exact text search** (case-insensitive ILIKE matching)
-- Entity extraction via local Llama 3.2
+- Entity extraction and canonicalization with alias resolution
 - E2E test infrastructure with separate test containers
 - Backup/restore workflow
 - **Knowledge management**: Full CRUD operations for Markdown documents
 - **Markdown parsing**: Automatic structure extraction with sections and hierarchy
 - **Section retrieval**: Get specific sections by ID from knowledge documents
+- **Health checks**: Clean MCP ping-based health monitoring without log spam
 
 ### What's Next (TODOs)
 - Build unified search across memories and knowledge
 - Add "crystallize" function to extract knowledge from memories
 - Add temporal search (memories from time period)
-- Add entity-based search (all memories about X)
-- CLI tool for dogfooding (`uv run alpha-brain remember`)
+- Entity merge functionality (combine misspelled/duplicate entities)
+- Import canonical entities from JSON file via MCP tool
 
 ## Common Patterns
 
@@ -240,6 +252,18 @@ async def test_entity_merge_preserves_all_aliases():
 ```
 
 Remember: The test is the specification. Sweat the details in the test, then let me handle the implementation.
+
+### Import Canonical Entities
+
+To import canonical entity names from a JSON file:
+
+```bash
+# View generated docker commands (dry run)
+uv run alpha-brain import-entities canonical_names.local.json
+
+# Copy the docker commands and execute them to import
+# Example format in canonical_names.example.json
+```
 
 ## Commit Workflow
 
