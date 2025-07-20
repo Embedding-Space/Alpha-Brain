@@ -1,0 +1,14 @@
+Current time: {{ current_time | format_time_full }}
+
+{{ memory.created_at | format_time }}
+
+{{ memory.content }}
+{% if memory.marginalia %}
+{% if memory.marginalia.importance %}
+
+Importance: {{ memory.marginalia.importance }}/5
+{% endif %}
+{% if memory.marginalia.entities %}
+Entities: {{ memory.marginalia.entities | join(", ") }}
+{% endif %}
+{% endif %}

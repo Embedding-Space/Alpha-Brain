@@ -1,0 +1,14 @@
+Current time: {{ current_time | format_time_full }}
+
+{% for memory in memories %}
+---
+{{ loop.index }}. {{ memory.age }} (similarity: {{ "%.2f" | format(memory.similarity_score) }}):
+
+{{ memory.content }}
+
+ID: {{ memory.id }}
+{%- if memory.semantic_similarity is defined and memory.emotional_similarity is defined %}
+Semantic similarity: {{ "%.2f" | format(memory.semantic_similarity) }}, Emotional similarity: {{ "%.2f" | format(memory.emotional_similarity) }}
+{%- endif %}
+
+{% endfor %}

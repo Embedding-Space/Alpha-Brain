@@ -124,6 +124,7 @@ class MemoryService:
                         "keywords": metadata.get("keywords", []),
                     },
                     "splash": splash_output,
+                    "splash_analysis": splash_analysis,
                 }
 
         except Exception as e:

@@ -1,6 +1,7 @@
 """Search tool for finding memories."""
 
 from alpha_brain.memory_service import get_memory_service
+from alpha_brain.templates import render_output
 
 
 async def search(query: str, search_type: str = "semantic", limit: int = 10) -> str:
@@ -21,18 +22,6 @@ async def search(query: str, search_type: str = "semantic", limit: int = 10) -> 
     if not memories:
         return f"No memories found matching '{query}'."
 
-    # Build a prose response
-    results = []
-    for mem in memories:
-        if mem.similarity_score is not None:
-            score_text = f" (similarity: {mem.similarity_score * 100:.1f}%)"
-        else:
-            score_text = ""  # No score for exact matches
-
-        results.append(
-            f"• {mem.age}{score_text} [ID: {mem.id}]: {mem.content[:200]}"
-            + ("..." if len(mem.content) > 200 else "")
-        )
-
-    header = f"Found {len(memories)} memor{'ies' if len(memories) != 1 else 'y'} matching '{query}':"
-    return header + "\n\n" + "\n\n".join(results)
+    return render_output(
+        "search", query=query, search_type=search_type, memories=memories
+    )

@@ -1,0 +1,39 @@
+Current time: {{ current_time | format_time_full }}
+
+ID: {{ memory_id }}
+{% if summary %}
+
+Summary: {{ summary }}
+{% endif %}
+{% if splash_analysis %}
+
+🌊 **Splash Analysis** - {{ splash_analysis.mode | capitalize }} resonance distribution
+{% if splash_analysis.most_similar %}
+
+🔗 **{{ splash_analysis.most_similar | length }} Most Similar**
+
+{% for memory in splash_analysis.most_similar %}
+---
+{{ loop.index }}. {{ memory.age }} (similarity: {{ "%.2f" | format(memory.similarity_score) }}):
+
+{{ memory.content }}
+
+ID: {{ memory.memory_id }}
+{% endfor %}
+{% endif %}
+{% if splash_analysis.least_similar %}
+
+⚡ **{{ splash_analysis.least_similar | length }} Least Similar**
+
+{% for memory in splash_analysis.least_similar %}
+---
+{{ loop.index }}. {{ memory.age }} (similarity: {{ "%.2f" | format(memory.similarity_score) }}):
+
+{{ memory.content }}
+
+ID: {{ memory.memory_id }}
+{% endfor %}
+{% endif %}
+{% elif splash %}
+{{ splash }}
+{% endif %}

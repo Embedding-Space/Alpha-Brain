@@ -3,6 +3,7 @@
 from uuid import UUID
 
 from alpha_brain.memory_service import get_memory_service
+from alpha_brain.templates import render_output
 
 
 async def get_memory(memory_id: str) -> str:
@@ -29,40 +30,5 @@ async def get_memory(memory_id: str) -> str:
     if not memory:
         return f"No memory found with ID: {memory_id}"
 
-    # Build a comprehensive prose response
-    result = f"Memory ID: {memory.id}\n"
-    result += f"Created: {memory.created_at.isoformat()} ({memory.age})\n"
-    result += "\n"
-    result += f"Content:\n{memory.content}\n"
-
-    # Include marginalia if available
-    if memory.marginalia:
-        result += "\n--- Marginalia ---\n"
-
-        # Extract key marginalia fields
-        summary = memory.marginalia.get("summary", "")
-        if summary:
-            result += f"Summary: {summary}\n"
-
-        importance = memory.marginalia.get("importance", None)
-        if importance is not None:
-            result += f"Importance: {importance}/5\n"
-
-        entities = memory.marginalia.get("entities", [])
-        if entities:
-            result += f"Entities: {', '.join(entities)}\n"
-
-        unknown_entities = memory.marginalia.get("unknown_entities", [])
-        if unknown_entities:
-            result += f"Unknown entities: {', '.join(unknown_entities)}\n"
-
-        keywords = memory.marginalia.get("keywords", [])
-        if keywords:
-            result += f"Keywords: {', '.join(keywords)}\n"
-
-        # Show analyzed_at if available
-        analyzed_at = memory.marginalia.get("analyzed_at", "")
-        if analyzed_at:
-            result += f"\nAnalyzed at: {analyzed_at}\n"
-
-    return result
+    # Use template to render output
+    return render_output("get_memory", memory=memory)

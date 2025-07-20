@@ -1,6 +1,7 @@
 """Remember tool for storing memories."""
 
 from alpha_brain.memory_service import get_memory_service
+from alpha_brain.templates import render_output
 
 
 async def remember(content: str) -> str:
@@ -18,23 +19,20 @@ async def remember(content: str) -> str:
         if len(preview) > 100:
             preview = preview[:100] + "..."
 
-        # Build a more informative response using metadata
+        # Build context for template
         metadata = result.get("metadata", {})
-        summary = metadata.get("summary", "")
+        context = {
+            "preview": preview,
+            "timestamp": result["timestamp"],
+            "memory_id": result["memory_id"],
+            "summary": metadata.get("summary", ""),
+            "splash": result.get("splash", ""),
+            "splash_analysis": result.get(
+                "splash_analysis"
+            ),  # Pass the raw analysis object
+        }
 
-        prose_result = (
-            f'Stored memory: "{preview}"\n\n'
-            f"Created at {result['timestamp']} (ID: {result['memory_id']})."
-        )
-
-        if summary:
-            prose_result += f"\n\nSummary: {summary}"
-
-        # Add splash analysis if available
-        splash = result.get("splash")
-        if splash:
-            prose_result += splash
-
+        prose_result = render_output("remember", **context)
         logger.info("remember_tool_returning_prose", prose=prose_result)
         return prose_result
 

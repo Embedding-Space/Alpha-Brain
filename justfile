@@ -18,6 +18,7 @@ down: test-down
 
 # Restart MCP server (picks up code changes)
 restart:
+    @just validate
     docker compose restart alpha-brain-mcp
 
 # Take the whole stack down and bring it back up
@@ -171,6 +172,11 @@ fix:
 # Find dead code
 dead:
     uv run vulture src/ .vulture_whitelist.py --min-confidence 80
+
+# Validate Python syntax and imports
+validate:
+    @echo "🐍 Validating Python code..."
+    @uv run python scripts/validate_python.py
 
 # Run all checks before committing
 check:

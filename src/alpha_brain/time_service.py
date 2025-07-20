@@ -203,3 +203,23 @@ class TimeService:
             return f"{readable} ({age})"
 
         return readable
+
+    @classmethod
+    def format_full(cls, dt: str | datetime | DateTime) -> str:
+        """Format datetime in full, consistent format ideal for temporal grounding.
+
+        Always shows: "November 19, 2024 at 2:38 PM PST"
+
+        This format is designed for AI model consumption - it's complete,
+        unambiguous, and doesn't change based on proximity to current time.
+
+        Args:
+            dt: The datetime to format
+
+        Returns:
+            Full datetime string with timezone
+        """
+        parsed = cls.parse(dt)
+        date_time_part = parsed.format("MMMM D, YYYY [at] h:mm A")
+        tz_abbr = parsed.format("zz")
+        return f"{date_time_part} {tz_abbr}"
