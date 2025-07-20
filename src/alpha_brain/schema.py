@@ -8,9 +8,10 @@ from uuid import UUID, uuid4
 
 from pgvector.sqlalchemy import Vector
 from pydantic import BaseModel, Field
-from sqlalchemy import ARRAY, Column, DateTime, String, Text
+from sqlalchemy import ARRAY, Column, DateTime, Interval, String, Text, func, or_
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
+from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import declarative_base
 
 Base = declarative_base()
@@ -173,3 +174,33 @@ class EntityBatch(BaseModel):
 
     version: str = Field(..., description="Schema version")
     entities: list[EntityInput] = Field(..., description="List of entities to import")
+
+
+class Context(Base):
+    """Context blocks for identity and state management."""
+    
+    __tablename__ = "context"
+    
+    section = Column(String, primary_key=True)
+    content = Column(Text, nullable=False)
+    ttl = Column(Interval)  # How long this should live
+    expires_at = Column(DateTime, nullable=True)  # When it expires
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
+    updated_at = Column(
+        DateTime,
+        nullable=False,
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+    )
+    
+    @hybrid_property
+    def is_active(self):
+        """Check if this context block is currently active."""
+        if self.expires_at is None:
+            return True
+        return self.expires_at > datetime.now(UTC)
+    
+    @is_active.expression
+    def is_active(cls):  # noqa: N805
+        """SQL expression for filtering active contexts."""
+        return or_(cls.expires_at.is_(None), cls.expires_at > func.now())

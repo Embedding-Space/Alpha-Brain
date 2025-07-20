@@ -14,7 +14,9 @@ from alpha_brain.tools import (
     list_knowledge,
     remember,
     search,
+    set_context,
     update_knowledge,
+    whoami,
 )
 
 logger = get_logger()
@@ -108,6 +110,8 @@ mcp.tool(get_knowledge)
 mcp.tool(update_knowledge)
 mcp.tool(list_knowledge)
 mcp.tool(add_alias)
+mcp.tool(set_context)
+mcp.tool(whoami)
 
 
 if __name__ == "__main__":

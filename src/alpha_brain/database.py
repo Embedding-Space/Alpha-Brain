@@ -84,6 +84,22 @@ async def init_db():
                 "CREATE INDEX IF NOT EXISTS idx_entity_aliases ON entities USING GIN (aliases)"
             )
         )
+        
+        # Create view for active context blocks
+        await conn.execute(
+            text("""
+                CREATE OR REPLACE VIEW active_context AS
+                SELECT * FROM context 
+                WHERE expires_at IS NULL OR expires_at > NOW()
+            """)
+        )
+        
+        # Create index on expires_at for efficient filtering
+        await conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS idx_context_expires ON context(expires_at) WHERE expires_at IS NOT NULL"
+            )
+        )
 
     logger.info("Database initialized")
 

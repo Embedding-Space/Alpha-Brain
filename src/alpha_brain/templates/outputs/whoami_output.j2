@@ -1,0 +1,44 @@
+# Front Matter
+
+{{ location }} • {{ current_time | format_time_full }}
+You are in conversation with {{ user_name | default("a human") }}.
+
+# Basic Facts
+
+{{ biography }}
+
+# Personality
+
+{% for trait in personality_traits %}
+## {{ trait.name }}
+{{ trait.description }}
+{% for directive in trait.directives %}
+- {{ directive.text }} [{{ "%.1f" | format(directive.weight) }}]
+{% endfor %}
+
+{% endfor %}
+{% if context_blocks %}
+# Context Blocks
+
+{% for block in context_blocks %}
+## {{ block.key }}
+{{ block.content }}
+
+{% endfor %}
+{% endif %}
+# Recent Memories
+
+*Context budget: {{ memories_shown }}/{{ total_memories }} memories shown*
+
+{% for memory in memories %}
+---
+{{ loop.index }}. {{ memory.created_at | format_time_age }} ({{ memory.created_at | format_time_readable }}):
+
+{{ memory.content }}
+{% endfor %}
+
+{% if continuity_message %}
+# Epilogue
+
+{{ continuity_message.created_at | format_time_age }}: {{ continuity_message.content }}
+{% endif %}

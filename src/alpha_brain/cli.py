@@ -399,6 +399,82 @@ async def list_knowledge_cmd(
         sys.exit(1)
 
 
+@app.command(name="set-context")
+async def set_context_cmd(
+    section: str,
+    content: str,
+    ttl: str | None = None,
+    server: str = DEFAULT_MCP_URL,
+) -> None:
+    """Set a context block for identity and state management.
+
+    Args:
+        section: Section name (e.g., "biography", "current_project")
+        content: Markdown content (use '-' to read from stdin)
+        ttl: Optional TTL (e.g., "3d", "1h") - not allowed for system sections
+        server: MCP server URL
+    """
+    try:
+        # Handle stdin input
+        if content == "-":
+            content = sys.stdin.read().strip()
+
+        params = {"section": section, "content": content}
+        if ttl:
+            params["ttl"] = ttl
+
+        async with Client(server) as client:
+            result = await client.call_tool("set_context", params)
+
+            if result.content and len(result.content) > 0:
+                text = result.content[0].text
+                console.print(text)
+            elif result.is_error:
+                console.print("[red]Failed to set context[/red]", style="bold red")
+            else:
+                console.print("[yellow]No content returned[/yellow]")
+
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]", style="bold red")
+        sys.exit(1)
+
+
+@app.command
+async def whoami(
+    server: str = DEFAULT_MCP_URL,
+    raw: bool = False,
+) -> None:
+    """Get complete initial context (identity, personality, memories).
+
+    Args:
+        server: MCP server URL
+        raw: Show raw output without formatting
+    """
+    try:
+        async with Client(server) as client:
+            result = await client.call_tool("whoami", {})
+
+            if raw:
+                # Show the raw CallToolResult structure
+                console.print(f"CallToolResult: {result}")
+                console.print(f"- data: {result.data}")
+                console.print(f"- content: {result.content}")
+                console.print(f"- structured_content: {result.structured_content}")
+                console.print(f"- is_error: {result.is_error}")
+            # Extract the text content
+            elif result.content and len(result.content) > 0:
+                text = result.content[0].text
+                console.print(text)
+            elif result.is_error:
+                console.print("[red]Error getting context[/red]", style="bold red")
+            else:
+                console.print("[yellow]No content returned[/yellow]")
+
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]", style="bold red")
+        sys.exit(1)
+
+
 @app.command(name="import-entities")
 async def import_entities_cmd(
     file_path: str,

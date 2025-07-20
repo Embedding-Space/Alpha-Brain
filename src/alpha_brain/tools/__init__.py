@@ -8,7 +8,9 @@ from .health_check import health_check
 from .list_knowledge import list_knowledge
 from .remember import remember
 from .search import search
+from .set_context import set_context
 from .update_knowledge import update_knowledge
+from .whoami import whoami
 
 __all__ = [
     "add_alias",
@@ -19,5 +21,7 @@ __all__ = [
     "list_knowledge",
     "remember",
     "search",
+    "set_context",
     "update_knowledge",
+    "whoami",
 ]
