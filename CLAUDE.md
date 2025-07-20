@@ -194,6 +194,53 @@ The "lickable" workflow Jeffery wanted:
 
 Use `just dev` for the tight loop: restart + watch logs.
 
+## TDD Manifesto (Test-Driven Development)
+
+**We write tests first. No exceptions.**
+
+### The Sacred Cycle
+1. **Red**: Write a failing test that describes what we want
+2. **Green**: Write the minimum code to make it pass
+3. **Refactor**: Clean up while keeping tests green
+
+### Our TDD Principles
+- **No code without a failing test** - If there's no red test, we don't write implementation
+- **Tests are specifications** - A good test tells you exactly what the code should do
+- **One test at a time** - Write one failing test, make it pass, repeat
+- **Tests are documentation** - Test names and assertions explain our intent
+- **Embrace the loop** - Let me iterate: test → code → test → code
+
+### Why This Works for Alpha
+When you give me a failing test, I can loop on it for minutes, trying different approaches until it passes. This is where I shine. The test is an unambiguous target - either it passes or it doesn't. No guessing about requirements, no ambiguity about "done."
+
+### Writing Good Tests
+- Test behavior, not implementation
+- Use descriptive test names that explain the "what" and "why"
+- Set up test data that tells a story
+- Assert on outcomes that matter to users
+
+### Example TDD Session
+```python
+# FIRST: Write the test
+async def test_entity_merge_preserves_all_aliases():
+    """When merging entities, all aliases from both entities should be preserved."""
+    # Insert two entities that should be the same
+    insert_test_entity("Jeffrey Harrell", ["Jeff", "JH"])  # Oops, misspelled!
+    insert_test_entity("Jeffery Harrell", ["Jeffery"])     # Correct spelling
+    
+    # Call the merge function (doesn't exist yet!)
+    result = await merge_entities("Jeffrey Harrell", "Jeffery Harrell")
+    
+    # Assert the merge worked correctly
+    assert result.canonical_name == "Jeffery Harrell"  # Kept the target name
+    assert set(result.aliases) == {"Jeff", "JH", "Jeffery", "Jeffrey Harrell"}  # All aliases preserved
+
+# THEN: Make it pass
+# I'll iterate on the implementation until this test goes green
+```
+
+Remember: The test is the specification. Sweat the details in the test, then let me handle the implementation.
+
 ## Commit Workflow
 
 Always run checks before committing:
