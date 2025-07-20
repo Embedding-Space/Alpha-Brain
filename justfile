@@ -116,7 +116,7 @@ coverage:
     uv run pytest tests/ --cov=alpha_brain --cov-report=term-missing -v
 
 # Remove containers and volumes
-clean:
+clean: down
     docker compose down -v
 
 # Clean Python cache files (useful when code changes aren't being picked up)

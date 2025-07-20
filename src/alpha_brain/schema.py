@@ -35,8 +35,8 @@ class Memory(Base):
         Vector(7)
     )  # 7D emotion vector: anger, disgust, fear, joy, neutral, sadness, surprise
 
-    # Extra data - flexible JSON field for metadata and future expansion
-    extra_data = Column(JSON, default={})
+    # Marginalia - Helper's annotations and glosses added to memories
+    marginalia = Column(JSON, default={})
 
     # For future TTL support if we want ephemeral memories
     expires_at = Column(DateTime, nullable=True)
@@ -46,8 +46,8 @@ class MemoryInput(BaseModel):
     """Input model for creating a memory."""
 
     content: str = Field(..., description="The prose content to remember")
-    extra_data: dict[str, Any] = Field(
-        default_factory=dict, description="Optional extra data about this memory"
+    marginalia: dict[str, Any] = Field(
+        default_factory=dict, description="Helper's annotations: entities, categories, and other glosses"
     )
 
 
@@ -60,7 +60,7 @@ class MemoryOutput(BaseModel):
     similarity_score: float | None = Field(
         None, description="Similarity score if from a search"
     )
-    extra_data: dict[str, Any] = {}
+    marginalia: dict[str, Any] = {}
 
     # Human-readable age
     age: str | None = Field(None, description="Human-readable age like '5 minutes ago'")

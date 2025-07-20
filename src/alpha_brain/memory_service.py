@@ -66,14 +66,14 @@ class MemoryService:
             }
 
     async def remember(
-        self, content: str, extra_data: dict[str, Any] | None = None
+        self, content: str, marginalia: dict[str, Any] | None = None
     ) -> dict[str, Any]:
         """
         Store a new memory.
 
         Args:
             content: The prose content to remember
-            extra_data: Optional metadata
+            marginalia: Optional annotations and glosses
 
         Returns:
             Dict with status and memory details
@@ -86,8 +86,8 @@ class MemoryService:
             # Then analyze the memory (optional, can fail gracefully)
             metadata = await self._analyze_memory_safe(content)
 
-            # Merge provided extra_data with our metadata
-            combined_extra_data = {**(extra_data or {}), **metadata}
+            # Merge provided marginalia with our metadata
+            combined_marginalia = {**(marginalia or {}), **metadata}
 
             async with get_db() as session:
                 memory = Memory(
@@ -96,7 +96,7 @@ class MemoryService:
                     created_at=pendulum.now("UTC"),
                     semantic_embedding=semantic_emb.tolist(),
                     emotional_embedding=emotional_emb.tolist(),
-                    extra_data=combined_extra_data,
+                    marginalia=combined_marginalia,
                 )
 
                 session.add(memory)
@@ -162,7 +162,7 @@ class MemoryService:
                             Memory.id,
                             Memory.content,
                             Memory.created_at,
-                            Memory.extra_data,
+                            Memory.marginalia,
                         )
                         .where(Memory.content.ilike(f"%{query}%"))
                         .order_by(Memory.created_at.desc())
@@ -183,7 +183,7 @@ class MemoryService:
                                 Memory.id,
                                 Memory.content,
                                 Memory.created_at,
-                                Memory.extra_data,
+                                Memory.marginalia,
                                 Memory.semantic_embedding.cosine_distance(
                                     semantic_emb.tolist()
                                 ).label("distance"),
@@ -204,7 +204,7 @@ class MemoryService:
                                 Memory.id,
                                 Memory.content,
                                 Memory.created_at,
-                                Memory.extra_data,
+                                Memory.marginalia,
                                 Memory.emotional_embedding.cosine_distance(
                                     emotional_emb.tolist()
                                 ).label("distance"),
@@ -233,7 +233,7 @@ class MemoryService:
                                 Memory.id,
                                 Memory.content,
                                 Memory.created_at,
-                                Memory.extra_data,
+                                Memory.marginalia,
                                 avg_distance.label("distance"),
                             )
                             .where(Memory.semantic_embedding.is_not(None))
@@ -264,7 +264,7 @@ class MemoryService:
                         content=row.content,
                         created_at=row.created_at,
                         similarity_score=similarity_score,
-                        extra_data=row.extra_data or {},
+                        marginalia=row.marginalia or {},
                         age=age,
                     )
 
@@ -299,7 +299,7 @@ class MemoryService:
                     Memory.id,
                     Memory.content,
                     Memory.created_at,
-                    Memory.extra_data,
+                    Memory.marginalia,
                 ).where(Memory.id == memory_id)
 
                 result = await session.execute(stmt)
@@ -316,7 +316,7 @@ class MemoryService:
                     id=row.id,
                     content=row.content,
                     created_at=row.created_at,
-                    extra_data=row.extra_data or {},
+                    marginalia=row.marginalia or {},
                     age=age,
                 )
 
