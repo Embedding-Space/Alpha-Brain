@@ -44,18 +44,9 @@ test: test-up
     #!/usr/bin/env bash
     set -euo pipefail
     
-    echo "⏳ Waiting for test MCP server to be ready..."
-    
-    # Use our wait_for_mcp script to check connectivity (3 attempts with retries)
-    if ! uv run python tests/wait_for_mcp.py http://localhost:9101/mcp/; then
-        echo "❌ Test MCP server is not responding!"
-        echo "Run 'just test-up' to start test containers"
-        exit 1
-    fi
-    
     echo "🏃 Running tests against test containers..."
     
-    # Run tests
+    # Run tests - test-up with --wait ensures server is ready
     if env MCP_TEST_URL="http://localhost:9101/mcp/" uv run pytest tests/e2e/ -v -s; then
         echo "✅ Tests passed!"
     else
@@ -154,17 +145,8 @@ test-one test_path:
     #!/usr/bin/env bash
     set -euo pipefail
     
-    # Ensure test containers are up
+    # Ensure test containers are up - test-up with --wait ensures server is ready
     just test-up
-    
-    echo "⏳ Waiting for test MCP server to be ready..."
-    
-    # Use our wait_for_mcp script to check connectivity (3 attempts with retries)
-    if ! uv run python tests/wait_for_mcp.py http://localhost:9101/mcp/; then
-        echo "❌ Test MCP server is not responding!"
-        echo "Check logs with: docker logs alpha-brain-test-mcp"
-        exit 1
-    fi
     
     echo "🏃 Running specific test: {{test_path}}"
     

@@ -66,6 +66,12 @@ services:
       - ./pyproject.toml:/app/pyproject.toml:ro
       # Cache directories for models (default location)
       - model_cache:/root/.cache
+    healthcheck:
+      test: ["CMD", "python", "-m", "alpha_brain.health", "http://localhost:9100/mcp/"]
+      interval: 5s
+      timeout: 10s
+      retries: 12
+      start_period: 10s
     restart: unless-stopped
 
   # Test containers - part of main stack but started separately
@@ -111,6 +117,12 @@ services:
       - ./src/alpha_brain:/app/src/alpha_brain:ro
       - ./pyproject.toml:/app/pyproject.toml:ro
       - model_cache:/root/.cache
+    healthcheck:
+      test: ["CMD", "python", "-m", "alpha_brain.health", "http://localhost:9100/mcp/"]
+      interval: 5s
+      timeout: 10s
+      retries: 12
+      start_period: 10s
     restart: "no"
 
 volumes:
