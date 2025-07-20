@@ -18,15 +18,22 @@ from alpha_brain.tools import (
 
 logger = get_logger()
 
+# Global initialization flag
+_initialized = False
 
-@asynccontextmanager
-async def lifespan(app):
-    """Manage server lifecycle."""
-    # Startup
-    print("LIFESPAN: Starting up...")
+
+async def initialize_services():
+    """Initialize database and embedding services once at startup."""
+    global _initialized
+    if _initialized:
+        return
+
+    logger.info("Initializing Alpha Brain services...")
+
     from alpha_brain.database import init_db
     from alpha_brain.embeddings import get_embedding_service
 
+    # Initialize database
     await init_db()
 
     # Initialize embedding service
@@ -45,15 +52,22 @@ async def lifespan(app):
     except Exception as e:
         logger.warning("Failed to warm up embedding models", error=str(e))
 
-    logger.info("Server ready!")
+    _initialized = True
+    logger.info("Alpha Brain services initialized!")
+
+
+@asynccontextmanager
+async def lifespan(app):
+    """Manage MCP connection lifecycle."""
+    # Ensure services are initialized (will only run once)
+    await initialize_services()
+
+    # Log connection lifecycle for debugging
+    logger.debug("MCP connection established")
 
     yield
 
-    # Shutdown
-    from alpha_brain.database import close_db
-
-    await close_db()
-    logger.info("Server stopped")
+    logger.debug("MCP connection closed")
 
 
 # Create the MCP server

@@ -14,3 +14,6 @@ wheels/
 
 # macOS files
 *.DS_Store
+
+# Local entity configuration
+canonical_names.local.json

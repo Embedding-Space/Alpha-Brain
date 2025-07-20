@@ -21,12 +21,10 @@ async def check_mcp_server(url: str, max_attempts: int = 30) -> bool:
     for _attempt in range(max_attempts):
         try:
             async with Client(url) as client:
-                # If we can connect and get server info, it's ready
-                if client.initialize_result and client.initialize_result.serverInfo:
-                    print(
-                        f"\n✓ Connected to {client.initialize_result.serverInfo.name}!"
-                    )
-                    return True
+                # Just ping the server - cleaner than full initialization
+                await client.ping()
+                print("\n✓ Server is healthy!")
+                return True
         except Exception:
             # Server not ready yet
             print(".", end="", flush=True)

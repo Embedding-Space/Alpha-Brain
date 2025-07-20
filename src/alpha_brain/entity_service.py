@@ -1,0 +1,130 @@
+"""Entity service for canonical name resolution."""
+
+from __future__ import annotations
+
+from typing import Any
+
+from sqlalchemy import select, text
+from structlog import get_logger
+
+from alpha_brain.database import get_db
+from alpha_brain.schema import Entity
+
+logger = get_logger()
+
+
+class EntityService:
+    """Service for managing canonical entities and their aliases."""
+
+    async def get_canonical_name(self, name: str) -> str | None:
+        """
+        Look up the canonical name for a given name or alias.
+
+        Args:
+            name: The name to canonicalize
+
+        Returns:
+            The canonical name if found, None otherwise
+        """
+        async with get_db() as session:
+            # First check if it's already a canonical name
+            stmt = select(Entity.canonical_name).where(Entity.canonical_name == name)
+            result = await session.execute(stmt)
+            if result.scalar_one_or_none():
+                return name
+
+            # Then check if it's an alias using PostgreSQL ANY operator
+            stmt = select(Entity.canonical_name).where(
+                text(":name = ANY(aliases)").bindparams(name=name)
+            )
+            result = await session.execute(stmt)
+            return result.scalar_one_or_none()
+
+    async def canonicalize_names(self, names: list[str]) -> dict[str, Any]:
+        """
+        Canonicalize a list of names, returning canonical forms and unknowns.
+
+        Args:
+            names: List of names to canonicalize
+
+        Returns:
+            Dict with 'canonical' list and 'unknown' list
+        """
+        canonical_names = []
+        unknown_names = []
+
+        for name in names:
+            canonical = await self.get_canonical_name(name)
+            if canonical:
+                canonical_names.append(canonical)
+            else:
+                unknown_names.append(name)
+
+        # Deduplicate canonical names
+        canonical_names = list(set(canonical_names))
+
+        return {"entities": canonical_names, "unknown_entities": unknown_names}
+
+    async def add_entity(self, canonical_name: str, aliases: list[str]) -> None:
+        """
+        Add a new entity with its aliases.
+
+        Args:
+            canonical_name: The canonical form of the entity
+            aliases: List of aliases that map to this canonical name
+        """
+        async with get_db() as session:
+            entity = Entity(canonical_name=canonical_name, aliases=aliases)
+            session.add(entity)
+            await session.commit()
+
+            logger.info(
+                "Entity added", canonical=canonical_name, alias_count=len(aliases)
+            )
+
+    async def import_entities(self, entities: list[dict[str, Any]]) -> dict[str, Any]:
+        """
+        Import multiple entities from a batch.
+
+        Args:
+            entities: List of entity dicts with 'canonical' and 'aliases'
+
+        Returns:
+            Import results with counts
+        """
+        imported = 0
+        skipped = 0
+        errors = []
+
+        for entity_data in entities:
+            try:
+                canonical = entity_data["canonical"]
+                aliases = entity_data.get("aliases", [])
+
+                # Check if entity already exists
+                existing = await self.get_canonical_name(canonical)
+                if existing:
+                    skipped += 1
+                    logger.info("Entity already exists", canonical=canonical)
+                    continue
+
+                await self.add_entity(canonical, aliases)
+                imported += 1
+
+            except Exception as e:
+                errors.append(f"Failed to import {entity_data}: {e!s}")
+                logger.error("Entity import failed", entity=entity_data, error=str(e))
+
+        return {"imported": imported, "skipped": skipped, "errors": errors}
+
+
+# Global instance
+_entity_service = None
+
+
+def get_entity_service() -> EntityService:
+    """Get the global entity service instance."""
+    global _entity_service
+    if _entity_service is None:
+        _entity_service = EntityService()
+    return _entity_service

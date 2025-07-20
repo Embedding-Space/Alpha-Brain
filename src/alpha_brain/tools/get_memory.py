@@ -44,29 +44,17 @@ async def get_memory(memory_id: str) -> str:
         if summary:
             result += f"Summary: {summary}\n"
 
-        emotional_tone = memory.marginalia.get("emotional_tone", "")
-        if emotional_tone:
-            result += f"Emotional Tone: {emotional_tone}\n"
-
         importance = memory.marginalia.get("importance", None)
         if importance is not None:
             result += f"Importance: {importance}/5\n"
 
-        people = memory.marginalia.get("people", [])
-        if people:
-            result += f"People: {', '.join(people)}\n"
+        entities = memory.marginalia.get("entities", [])
+        if entities:
+            result += f"Entities: {', '.join(entities)}\n"
 
-        technologies = memory.marginalia.get("technologies", [])
-        if technologies:
-            result += f"Technologies: {', '.join(technologies)}\n"
-
-        organizations = memory.marginalia.get("organizations", [])
-        if organizations:
-            result += f"Organizations: {', '.join(organizations)}\n"
-
-        places = memory.marginalia.get("places", [])
-        if places:
-            result += f"Places: {', '.join(places)}\n"
+        unknown_entities = memory.marginalia.get("unknown_entities", [])
+        if unknown_entities:
+            result += f"Unknown entities: {', '.join(unknown_entities)}\n"
 
         keywords = memory.marginalia.get("keywords", [])
         if keywords:

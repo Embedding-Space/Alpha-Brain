@@ -11,11 +11,14 @@ Production usage should be through MCP tools where shell escaping is not an issu
 
 import json
 import sys
+from pathlib import Path
 
 import cyclopts
 from fastmcp import Client
 from rich.console import Console
 from rich.syntax import Syntax
+
+from alpha_brain.schema import EntityBatch
 
 app = cyclopts.App(
     name="alpha-brain",
@@ -349,6 +352,111 @@ async def list_knowledge_cmd(
                 console.print("[red]Failed to list knowledge[/red]", style="bold red")
             else:
                 console.print("[yellow]No content returned[/yellow]")
+
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]", style="bold red")
+        sys.exit(1)
+
+
+@app.command(name="import-entities")
+async def import_entities_cmd(
+    file_path: str,
+    server: str = DEFAULT_MCP_URL,
+) -> None:
+    """Import canonical entities from a JSON file.
+
+    The JSON file should have the following structure:
+    {
+        "version": "1.0",
+        "entities": [
+            {
+                "canonical": "Jeffery Harrell",
+                "aliases": ["Jeffery", "Jeff"]
+            }
+        ]
+    }
+
+    Args:
+        file_path: Path to the JSON file containing entities
+        server: MCP server URL
+    """
+    try:
+        # Read and validate the JSON file
+        path = Path(file_path)
+        if not path.exists():
+            console.print(f"[red]File not found: {file_path}[/red]", style="bold red")
+            sys.exit(1)
+
+        with path.open(encoding="utf-8") as f:
+            data = json.load(f)
+
+        # Validate against schema
+        try:
+            batch = EntityBatch(**data)
+        except Exception as e:
+            console.print(f"[red]Invalid JSON structure: {e}[/red]", style="bold red")
+            sys.exit(1)
+
+        # Validate for duplicates
+        all_aliases = []
+        canonical_names = set()
+
+        for entity in batch.entities:
+            # Check for duplicate canonical names
+            if entity.canonical in canonical_names:
+                console.print(
+                    f"[red]Duplicate canonical name: {entity.canonical}[/red]",
+                    style="bold red",
+                )
+                sys.exit(1)
+            canonical_names.add(entity.canonical)
+
+            # Collect all aliases for duplicate check
+            all_aliases.extend(entity.aliases)
+
+            # Check if canonical name appears in any aliases
+            if entity.canonical in entity.aliases:
+                console.print(
+                    f"[red]Canonical name '{entity.canonical}' appears in its own aliases[/red]",
+                    style="bold red",
+                )
+                sys.exit(1)
+
+        # Check for duplicate aliases
+        if len(all_aliases) != len(set(all_aliases)):
+            console.print(
+                "[red]Duplicate aliases found across entities[/red]", style="bold red"
+            )
+            sys.exit(1)
+
+        # Check if any alias matches a canonical name
+        for alias in all_aliases:
+            if alias in canonical_names:
+                console.print(
+                    f"[red]Alias '{alias}' matches a canonical name[/red]",
+                    style="bold red",
+                )
+                sys.exit(1)
+
+        console.print(f"[cyan]Importing {len(batch.entities)} entities...[/cyan]")
+
+        # For now, we need to use docker to import directly
+        # TODO: Add an MCP tool for entity import
+        console.print(
+            "[yellow]Note: Direct entity import via CLI requires DATABASE_URL[/yellow]"
+        )
+        console.print("[yellow]For now, use docker exec to import entities:[/yellow]")
+        console.print()
+
+        # Show example command
+        for entity in batch.entities:
+            aliases_str = "{" + ",".join(f'"{a}"' for a in entity.aliases) + "}"
+            cmd = f"INSERT INTO entities (canonical_name, aliases, created_at, updated_at) VALUES ('{entity.canonical}', '{aliases_str}', NOW(), NOW());"
+            console.print(
+                f'docker exec alpha-brain-postgres psql -U alpha -d alpha_brain -c "{cmd}"'
+            )
+
+        return
 
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]", style="bold red")

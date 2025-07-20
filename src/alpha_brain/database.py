@@ -78,6 +78,13 @@ async def init_db():
         # Create tables
         await conn.run_sync(Base.metadata.create_all)
 
+        # Create GIN index for entity aliases (for fast array lookups)
+        await conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS idx_entity_aliases ON entities USING GIN (aliases)"
+            )
+        )
+
     logger.info("Database initialized")
 
 

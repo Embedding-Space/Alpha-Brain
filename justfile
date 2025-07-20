@@ -34,7 +34,7 @@ test-clean:
     docker compose -f docker-compose.test.yml down -v
 
 # Start test containers (uses existing embedding service)
-test-up:
+test-up: up
     @echo "🚀 Starting test containers..."
     docker compose --profile test up -d --wait test-postgres test-mcp
     @echo "✅ Test containers ready at http://localhost:9101/mcp/"

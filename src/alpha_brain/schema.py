@@ -8,7 +8,7 @@ from uuid import UUID, uuid4
 
 from pgvector.sqlalchemy import Vector
 from pydantic import BaseModel, Field
-from sqlalchemy import JSON, Column, DateTime, String, Text
+from sqlalchemy import ARRAY, JSON, Column, DateTime, String, Text
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import declarative_base
 
@@ -47,7 +47,8 @@ class MemoryInput(BaseModel):
 
     content: str = Field(..., description="The prose content to remember")
     marginalia: dict[str, Any] = Field(
-        default_factory=dict, description="Helper's annotations: entities, categories, and other glosses"
+        default_factory=dict,
+        description="Helper's annotations: entities, categories, and other glosses",
     )
 
 
@@ -133,3 +134,41 @@ class KnowledgeOutput(BaseModel):
     structure: dict[str, Any]
     created_at: datetime
     updated_at: datetime
+
+
+class Entity(Base):
+    """Canonical entity names with their aliases for normalization."""
+
+    __tablename__ = "entities"
+
+    # Use canonical name as primary key - it's unique and meaningful
+    canonical_name = Column(String, primary_key=True)
+
+    # Array of aliases that resolve to this canonical name
+    aliases = Column(ARRAY(String), nullable=False, default=[])
+
+    # Timestamps for tracking
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
+    updated_at = Column(
+        DateTime,
+        nullable=False,
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+    )
+
+
+class EntityInput(BaseModel):
+    """Input model for creating/updating entities."""
+
+    canonical: str = Field(..., description="The canonical name")
+    aliases: list[str] = Field(
+        default_factory=list,
+        description="List of aliases that map to this canonical name",
+    )
+
+
+class EntityBatch(BaseModel):
+    """Batch of entities for import."""
+
+    version: str = Field(..., description="Schema version")
+    entities: list[EntityInput] = Field(..., description="List of entities to import")

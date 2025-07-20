@@ -16,6 +16,8 @@ services:
     networks:
       - alpha-brain-network
     # No exposed ports - only internal access
+    ports:
+      - "5432:5432"  # Expose for local development
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U alpha -d alpha_brain"]
       interval: 5s

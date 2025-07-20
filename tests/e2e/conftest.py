@@ -11,7 +11,7 @@ from fastmcp import Client
 def mcp_url():
     """URL for the MCP server."""
     # Use test URL if provided, otherwise default
-    return os.environ.get("MCP_TEST_URL", "http://localhost:9100/mcp/")
+    return os.environ.get("MCP_TEST_URL", "http://localhost:9101/mcp/")
 
 
 @pytest.fixture(autouse=True)
@@ -29,7 +29,7 @@ def clean_database():
             "-d",
             "alpha_brain_test",
             "-c",
-            "TRUNCATE TABLE knowledge CASCADE; TRUNCATE TABLE memories CASCADE;",
+            "TRUNCATE TABLE knowledge CASCADE; TRUNCATE TABLE memories CASCADE; TRUNCATE TABLE entities CASCADE;",
         ],
         check=False,  # Don't fail if tables don't exist yet
         capture_output=True,

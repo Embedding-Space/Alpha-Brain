@@ -37,11 +37,8 @@ class MemoryService:
 
             # Convert to dict for storage
             metadata_dict = {
-                "people": metadata.people,
-                "technologies": metadata.technologies,
-                "organizations": metadata.organizations,
-                "places": metadata.places,
-                "emotional_tone": metadata.emotional_tone,
+                "entities": metadata.entities,
+                "unknown_entities": metadata.unknown_entities,
                 "importance": metadata.importance,
                 "keywords": metadata.keywords,
                 "summary": metadata.summary,
@@ -50,10 +47,9 @@ class MemoryService:
 
             logger.info(
                 "Memory analyzed",
-                people_count=len(metadata.people),
-                tech_count=len(metadata.technologies),
+                entity_count=len(metadata.entities),
+                unknown_count=len(metadata.unknown_entities),
                 importance=metadata.importance,
-                tone=metadata.emotional_tone,
             )
             return metadata_dict
         except Exception as e:
@@ -125,7 +121,6 @@ class MemoryService:
                     "metadata": {
                         "summary": metadata.get("summary", ""),
                         "importance": metadata.get("importance", 3),
-                        "emotional_tone": metadata.get("emotional_tone", "neutral"),
                         "keywords": metadata.get("keywords", []),
                     },
                     "splash": splash_output,

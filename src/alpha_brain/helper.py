@@ -9,6 +9,7 @@ from pydantic_ai.models.openai import OpenAIModel
 from pydantic_ai.settings import ModelSettings
 from structlog import get_logger
 
+from alpha_brain.entity_service import get_entity_service
 from alpha_brain.prompts import render_prompt
 from alpha_brain.settings import get_settings
 
@@ -18,23 +19,15 @@ logger = get_logger()
 class MemoryMetadata(BaseModel):
     """Rich metadata extracted from memory through sequential questions."""
 
-    people: list[str] = Field(
-        default_factory=list, description="People mentioned in the memory"
+    # Canonical entities found in the memory
+    entities: list[str] = Field(
+        default_factory=list, description="Canonicalized entity names"
     )
-    technologies: list[str] = Field(
-        default_factory=list,
-        description="Technologies, tools, or technical terms mentioned",
+    unknown_entities: list[str] = Field(
+        default_factory=list, description="Entity names that couldn't be canonicalized"
     )
-    organizations: list[str] = Field(
-        default_factory=list, description="Organizations or companies mentioned"
-    )
-    places: list[str] = Field(
-        default_factory=list, description="Places or locations mentioned"
-    )
-    emotional_tone: str = Field(
-        default="neutral",
-        description="Overall emotional tone (e.g., happy, frustrated, excited, neutral)",
-    )
+
+    # Other metadata
     importance: int = Field(
         default=3, ge=1, le=5, description="Importance rating from 1-5"
     )
@@ -50,9 +43,10 @@ class MemoryMetadata(BaseModel):
 class MemoryHelper:
     """Helper model for analyzing memories using sequential questions."""
 
-    def __init__(self):
+    def __init__(self, entity_service=None):
         """Initialize with Ollama-compatible endpoint from settings."""
         settings = get_settings()
+        self.entity_service = entity_service or get_entity_service()
 
         # Set environment variables for pydantic-ai OpenAI model
         if settings.openai_base_url:
@@ -67,22 +61,9 @@ class MemoryHelper:
 
         # Define our interview questions
         self.questions = [
-            ("people", "Who are the people mentioned? List only names."),
             (
-                "technologies",
-                "What technologies, frameworks, or technical terms are mentioned? List only technical items.",
-            ),
-            (
-                "organizations",
-                "What organizations or companies are mentioned? List only organization names.",
-            ),
-            (
-                "places",
-                "What places or locations are mentioned? List only place names.",
-            ),
-            (
-                "emotional_tone",
-                "What is the emotional tone? Choose one: happy, excited, frustrated, anxious, neutral, sad",
+                "names",
+                "List all named entities (people, places, organizations, projects, pets) mentioned in this memory. Include nicknames and variations. List only names, one per line.",
             ),
             ("importance", "Rate the importance from 1-5. Output only the number."),
             (
@@ -145,6 +126,7 @@ class MemoryHelper:
 
             # Initialize metadata
             metadata = MemoryMetadata()
+            extracted_names = []
 
             # Ask each question sequentially
             for field_name, question in self.questions:
@@ -153,13 +135,10 @@ class MemoryHelper:
                     answer = response.output.strip()
 
                     # Parse response based on field type
-                    if field_name in [
-                        "people",
-                        "technologies",
-                        "organizations",
-                        "places",
-                        "keywords",
-                    ]:
+                    if field_name == "names":
+                        # Extract all named entities
+                        extracted_names = self.parse_list_response(answer)
+                    elif field_name == "keywords":
                         # List fields
                         setattr(metadata, field_name, self.parse_list_response(answer))
                     elif field_name == "importance":
@@ -184,12 +163,35 @@ class MemoryHelper:
                     )
                     # Continue with other questions
 
+            # Canonicalize the extracted names
+            logger.info(
+                "Names extraction result",
+                extracted_names=extracted_names,
+                count=len(extracted_names) if extracted_names else 0,
+            )
+
+            if extracted_names:
+                canonicalization_result = await self.entity_service.canonicalize_names(
+                    extracted_names
+                )
+                metadata.entities = canonicalization_result["entities"]
+                metadata.unknown_entities = canonicalization_result["unknown_entities"]
+
+                logger.info(
+                    "CANONICALIZATION COMPLETE",
+                    extracted=len(extracted_names),
+                    canonical=len(metadata.entities),
+                    unknown_count=len(metadata.unknown_entities),
+                    entities=metadata.entities,
+                    unknown_entities=metadata.unknown_entities,
+                )
+
             elapsed = time.time() - start_time
             logger.info(
                 "memory_analyzed",
                 duration_seconds=elapsed,
-                people_count=len(metadata.people),
-                tech_count=len(metadata.technologies),
+                entity_count=len(metadata.entities),
+                unknown_count=len(metadata.unknown_entities),
                 importance=metadata.importance,
             )
 
@@ -224,11 +226,8 @@ if __name__ == "__main__":
 
         try:
             result = await helper.analyze_memory(test_content)
-            print(f"People: {result.people}")
-            print(f"Technologies: {result.technologies}")
-            print(f"Organizations: {result.organizations}")
-            print(f"Places: {result.places}")
-            print(f"Emotional tone: {result.emotional_tone}")
+            print(f"Canonical entities: {result.entities}")
+            print(f"Unknown entities: {result.unknown_entities}")
             print(f"Importance: {result.importance}")
             print(f"Keywords: {result.keywords}")
             print(f"Summary: {result.summary}")
