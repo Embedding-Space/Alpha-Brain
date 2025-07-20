@@ -135,13 +135,20 @@ just clean-cache # Clean Python cache files
 - **Template system**: Editable Jinja2 templates for all tool outputs
 - **Temporal grounding**: Current time included in all outputs for AI context
 - **Python validation**: Pre-flight import checking before Docker restart
+- **Temporal search**: Natural language intervals ("yesterday", "past 3 hours") and ISO 8601
+- **Browse mode**: Search without query to see all memories in a time period
+- **Entity filtering**: Filter search results by canonical entity names
+- **FastMCP logging**: Server-side logging with Context parameter for debugging
 
 ### What's Next (TODOs)
 - Build unified search across memories and knowledge
 - Add "crystallize" function to extract knowledge from memories
-- Add temporal search (memories from time period)
+- ~~Add temporal search (memories from time period)~~ ✅ Implemented!
 - Entity merge functionality (combine misspelled/duplicate entities)
 - Import canonical entities from JSON file via MCP tool
+- Add pagination support (offset parameter) for large result sets
+- Update search output template for temporal results
+- Create OOBE (out-of-box experience) tests for fresh install
 
 ## Common Patterns
 
@@ -162,6 +169,29 @@ result = await service.remember(content)
 memories = await service.search(query, search_type="semantic")
 ```
 
+### Temporal Search Pattern
+```python
+# Natural language intervals
+memories = await service.search(interval="yesterday")
+memories = await service.search(interval="past 3 hours")
+memories = await service.search(interval="Thursday")  # Most recent Thursday
+
+# ISO 8601 intervals
+memories = await service.search(interval="2024-01-01/2024-01-31")
+memories = await service.search(interval="P3H/")  # Past 3 hours
+
+# Browse mode (no query)
+memories = await service.search(query="", interval="today")
+
+# Combine with entity and ordering
+memories = await service.search(
+    query="debugging",
+    interval="past week",
+    entity="Jeffery Harrell",
+    order="asc"  # Oldest first
+)
+```
+
 ### Testing Philosophy
 - **E2E tests only**: No unit or integration tests - our code is primarily glue between services
 - Tests simulate real user workflows through MCP tools, not individual functions
@@ -174,6 +204,9 @@ memories = await service.search(query, search_type="semantic")
 - Tests automatically wait for healthy containers via `wait_for_mcp.py`
 - Run tests with `just test` or single test with `just test-one <file>`
 - Tests focus on workflows: "user stores memory, then searches for it"
+- **Test data**: Pre-populated from `.local/test_dataset.sql` dump
+- **Module isolation**: Each test module gets a fresh database restore
+- **Test fixtures**: Use conftest.py patterns for database state management
 
 ## Gotchas and Solutions
 
@@ -194,6 +227,21 @@ memories = await service.search(query, search_type="semantic")
 ### IDE Diagnostics
 - VS Code may show errors for deleted files (cache issue)
 - Trust `just lint` over IDE squiggles
+- Pylance struggles with Pendulum types - use `cast()` and type hints liberally
+
+### Common Error Patterns
+
+#### "Unknown option: --interval"
+The CLI was updated with new parameters. Make sure you're using the latest CLI by running from the project root with `uv run alpha-brain`.
+
+#### Wrong timezone for temporal queries
+Intervals use **local timezone** (via geo-IP), not UTC. "Yesterday" means midnight-to-midnight in your local timezone, not UTC.
+
+#### "Context.__init__() missing required argument"
+FastMCP tools now require `ctx: Context` as the first parameter. Never provide a default value for Context parameters.
+
+#### ISO 8601 Duration Parsing
+Pendulum doesn't parse ISO durations directly. We have a custom parser in `interval_parser.py` that handles common formats like "P3H", "P7D", etc.
 
 ## Environment Variables
 
