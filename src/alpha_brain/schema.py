@@ -204,3 +204,22 @@ class Context(Base):
     def is_active(cls):  # noqa: N805
         """SQL expression for filtering active contexts."""
         return or_(cls.expires_at.is_(None), cls.expires_at > func.now())
+
+
+class IdentityFact(Base):
+    """Chronicle of identity changes and decisions over time."""
+    
+    __tablename__ = "identity_facts"
+    
+    id = Column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    fact = Column(Text, nullable=False)
+    
+    # Temporal information - we always store a datetime for sorting
+    occurred_at = Column(DateTime, nullable=False)  # Always stored for ordering
+    temporal_precision = Column(String, nullable=False, default="day")  # moment, day, month, year, period, era
+    temporal_display = Column(String)  # Original human-readable form like "Summer 2025"
+    
+    # For periods/ranges
+    period_end = Column(DateTime, nullable=True)  # End of period if applicable
+    
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))  # When recorded

@@ -1,6 +1,7 @@
 """Who Am I - Initial context loading for Alpha."""
 
 from alpha_brain.context_service import get_context_service
+from alpha_brain.identity_service import get_identity_service
 from alpha_brain.memory_service import get_memory_service
 from alpha_brain.templates import render_output
 
@@ -25,6 +26,7 @@ async def whoami(token_budget: int = 8000) -> str:
     """
     # Get services
     context_service = get_context_service()
+    identity_service = get_identity_service()
     memory_service = get_memory_service()
     
     # Get all active context blocks
@@ -48,6 +50,9 @@ async def whoami(token_budget: int = 8000) -> str:
                 "key": ctx.section,
                 "content": ctx.content
             })
+    
+    # Get identity facts (chronicle of becoming)
+    identity_facts = await identity_service.get_facts()
     
     # TODO: Real personality traits from PersonalityService
     # For now, using mock data
@@ -105,6 +110,7 @@ async def whoami(token_budget: int = 8000) -> str:
         location="Berkeley, California",  # TODO: From geo-IP or config
         user_name="Jeffery Harrell",      # TODO: From context or config
         biography=biography,
+        identity_facts=identity_facts,
         personality_traits=mock_personality,
         context_blocks=context_blocks,
         memories=memories,

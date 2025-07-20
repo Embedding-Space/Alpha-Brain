@@ -7,6 +7,7 @@ from structlog import get_logger
 
 from alpha_brain.tools import (
     add_alias,
+    add_identity_fact,
     create_knowledge,
     get_knowledge,
     get_memory,
@@ -93,6 +94,11 @@ mcp = FastMCP(
     Entity Tools:
     - add_alias() to teach the system about entity names and their aliases
     
+    Identity Tools:
+    - set_context() to manage biography, continuity messages, and context blocks
+    - add_identity_fact() to record significant moments of change and choice
+    - whoami() to get a comprehensive identity document
+    
     This system combines:
     - Diary Brain: Experiential memories with emotional context
     - Encyclopedia Brain: Structured knowledge documents with sections
@@ -111,6 +117,7 @@ mcp.tool(update_knowledge)
 mcp.tool(list_knowledge)
 mcp.tool(add_alias)
 mcp.tool(set_context)
+mcp.tool(add_identity_fact)
 mcp.tool(whoami)
 
 

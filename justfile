@@ -35,9 +35,9 @@ dev: restart
 logs *args:
     docker compose logs alpha-brain-mcp {{args}}
 
-# Connect to production database
-psql:
-    docker compose exec postgres psql -U alpha -d alpha_brain
+# Connect to production database (interactive or with command)
+psql *args:
+    docker compose exec postgres psql -U alpha -d alpha_brain {{args}}
 
 # === TESTING (E2E with populated data) ===
 

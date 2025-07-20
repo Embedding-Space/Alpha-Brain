@@ -35,6 +35,33 @@ def pluralize(count: int, singular: str = "", plural: str = "s") -> str:
 output_env.filters["pluralize"] = pluralize
 
 
+def format_identity_fact_time(fact) -> str:
+    """Format identity fact time based on precision level."""
+    # If there's a temporal_display, use it
+    if hasattr(fact, 'temporal_display') and fact.temporal_display:
+        return fact.temporal_display
+    
+    # Otherwise format based on precision
+    precision = getattr(fact, 'temporal_precision', 'day')
+    
+    if precision == 'datetime':
+        return TimeService.format_readable(fact.occurred_at)
+    elif precision == 'day':
+        # Format as just the date
+        return TimeService.parse(fact.occurred_at).format("MMMM D, YYYY")
+    elif precision == 'month':
+        return TimeService.parse(fact.occurred_at).format("MMMM YYYY")
+    elif precision == 'year':
+        return TimeService.parse(fact.occurred_at).format("YYYY")
+    else:
+        # For periods and eras, use display or fallback
+        return getattr(fact, 'temporal_display', TimeService.format_readable(fact.occurred_at))
+
+
+# Add identity fact formatting filter
+output_env.filters["format_identity_time"] = format_identity_fact_time
+
+
 def render_output(tool_name: str, **context) -> str:
     """
     Render an output template for a tool.

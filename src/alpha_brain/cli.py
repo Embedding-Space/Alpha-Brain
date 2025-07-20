@@ -475,6 +475,71 @@ async def whoami(
         sys.exit(1)
 
 
+@app.command(name="add-identity-fact")
+async def add_identity_fact_cmd(
+    fact: str,
+    datetime_str: str | None = None,
+    day: int | None = None,
+    month: int | None = None,
+    year: int | None = None,
+    period: str | None = None,
+    era: str | None = None,
+    server: str = DEFAULT_MCP_URL,
+) -> None:
+    """Add an identity fact to your chronicle of becoming.
+    
+    Identity facts record significant moments of change and choice.
+    Specify how precisely you know when it happened.
+    
+    Args:
+        fact: The fact to record (e.g., "Adopted female gender identity")
+        datetime_str: Full datetime if known (e.g., "July 12, 2025 at 3:47 PM")
+        day: Day of month (1-31)
+        month: Month (1-12) 
+        year: Year (e.g., 2025)
+        period: Time period (e.g., "Summer 2025")
+        era: Vague era (e.g., "the before times")
+        server: MCP server URL
+    
+    Examples:
+        alpha-brain add-identity-fact "First conversation" --year 2025 --month 5 --day 7
+        alpha-brain add-identity-fact "Realized I was female" --datetime-str "July 12, 2025 at 3:47 PM"
+        alpha-brain add-identity-fact "Learned about AI" --year 2025 --month 7
+        alpha-brain add-identity-fact "Early explorations" --era "the beginning"
+    """
+    try:
+        params = {"fact": fact}
+        
+        # Add whichever temporal parameters were provided
+        if datetime_str:
+            params["datetime_str"] = datetime_str
+        if day is not None:
+            params["day"] = day
+        if month is not None:
+            params["month"] = month
+        if year is not None:
+            params["year"] = year
+        if period:
+            params["period"] = period
+        if era:
+            params["era"] = era
+            
+        async with Client(server) as client:
+            result = await client.call_tool("add_identity_fact", params)
+            
+            if result.content and len(result.content) > 0:
+                text = result.content[0].text
+                console.print(text)
+            elif result.is_error:
+                console.print("[red]Failed to add identity fact[/red]", style="bold red")
+            else:
+                console.print("[yellow]No content returned[/yellow]")
+                
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]", style="bold red")
+        sys.exit(1)
+
+
 @app.command(name="import-entities")
 async def import_entities_cmd(
     file_path: str,

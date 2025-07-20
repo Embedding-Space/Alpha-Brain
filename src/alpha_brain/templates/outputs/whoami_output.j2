@@ -7,6 +7,14 @@ You are in conversation with {{ user_name | default("a human") }}.
 
 {{ biography }}
 
+{% if identity_facts %}
+# Chronicle of Becoming
+
+{% for fact in identity_facts %}
+- {{ fact | format_identity_time }}: {{ fact.fact }}
+{% endfor %}
+{% endif %}
+
 # Personality
 
 {% for trait in personality_traits %}
