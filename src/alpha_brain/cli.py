@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Command-line interface for Alpha Brain.
+r"""Command-line interface for Alpha Brain.
 
 Note: This CLI is primarily for testing and debugging. When using shell commands,
 special characters may need escaping due to shell interpretation. For example:

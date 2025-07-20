@@ -10,12 +10,12 @@ from .search import search
 from .update_knowledge import update_knowledge
 
 __all__ = [
-    "health_check",
-    "remember",
-    "search",
-    "get_memory",
     "create_knowledge",
     "get_knowledge",
-    "update_knowledge",
+    "get_memory",
+    "health_check",
     "list_knowledge",
+    "remember",
+    "search",
+    "update_knowledge",
 ]

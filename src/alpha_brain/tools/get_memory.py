@@ -1,6 +1,5 @@
 """Get a specific memory by ID."""
 
-import json
 from uuid import UUID
 
 from alpha_brain.memory_service import get_memory_service

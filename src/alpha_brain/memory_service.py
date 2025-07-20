@@ -14,6 +14,7 @@ from alpha_brain.database import get_db
 from alpha_brain.embeddings import get_embedding_service
 from alpha_brain.helper import MemoryHelper
 from alpha_brain.schema import Memory, MemoryOutput
+from alpha_brain.time_service import TimeService
 
 logger = get_logger()
 
@@ -232,8 +233,7 @@ class MemoryService:
                 memories = []
                 for row in rows:
                     # Calculate age
-                    created_at = pendulum.instance(row.created_at)
-                    age = created_at.diff_for_humans()
+                    age = TimeService.format_age(row.created_at)
 
                     # Calculate similarity score
                     if search_type == "exact":

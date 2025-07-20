@@ -3,6 +3,7 @@
 from alpha_brain.database import get_db
 from alpha_brain.knowledge_service import KnowledgeService
 from alpha_brain.schema import KnowledgeInput
+from alpha_brain.time_service import TimeService
 
 
 async def create_knowledge(slug: str, title: str, content: str) -> str:
@@ -35,10 +36,10 @@ async def create_knowledge(slug: str, title: str, content: str) -> str:
                 f'Created knowledge document "{result.title}" with slug "{result.slug}".\n\n'
                 f"Document ID: {result.id}\n"
                 f"Sections: {section_count}\n"
-                f"Created at: {result.created_at.isoformat()}"
+                f"Created at: {TimeService.format_readable(result.created_at)}"
             )
             
         except ValueError as e:
-            return f"Error: {str(e)}"
+            return f"Error: {e!s}"
         except Exception as e:
-            return f"Failed to create knowledge document: {str(e)}"
+            return f"Failed to create knowledge document: {e!s}"

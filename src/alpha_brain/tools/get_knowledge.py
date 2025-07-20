@@ -3,6 +3,7 @@
 from alpha_brain.database import get_db
 from alpha_brain.knowledge_service import KnowledgeService
 from alpha_brain.markdown_parser import get_table_of_contents
+from alpha_brain.time_service import TimeService
 
 
 async def get_knowledge(slug: str, section: str | None = None) -> str:
@@ -43,7 +44,7 @@ async def get_knowledge(slug: str, section: str | None = None) -> str:
         return (
             f"# {knowledge.title}\n\n"
             f"**Slug:** {knowledge.slug}\n"
-            f"**Last updated:** {knowledge.updated_at.isoformat()}\n\n"
+            f"**Last updated:** {TimeService.format_for_context(knowledge.updated_at)}\n\n"
             f"## Table of Contents\n\n{toc_text}\n\n"
             f"---\n\n"
             f"{knowledge.content}"

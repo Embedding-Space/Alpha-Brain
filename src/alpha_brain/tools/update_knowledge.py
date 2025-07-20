@@ -58,6 +58,6 @@ async def update_knowledge(slug: str, title: str | None = None, content: str | N
             )
             
         except ValueError as e:
-            return f"Error: {str(e)}"
+            return f"Error: {e!s}"
         except Exception as e:
-            return f"Failed to update knowledge document: {str(e)}"
+            return f"Failed to update knowledge document: {e!s}"

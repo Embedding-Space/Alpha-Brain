@@ -29,6 +29,7 @@ dependencies = [
     "greenlet>=3.2.3",
     "redis>=6.2.0",
     "mistune>=3.0.0",
+    "geocoder>=1.38.0",
 ]
 
 [project.scripts]

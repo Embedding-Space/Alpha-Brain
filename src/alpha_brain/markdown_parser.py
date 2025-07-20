@@ -143,12 +143,10 @@ def parse_markdown_to_structure(content: str) -> dict[str, Any]:
             'id': 'content'
         })
     
-    structure = {
+    return {
         "sections": sections,
         "hierarchy": _build_hierarchy(sections)
     }
-    
-    return structure
 
 
 def _slugify(text: str) -> str:
@@ -159,8 +157,7 @@ def _slugify(text: str) -> str:
     slug = re.sub(r'[^\w\s-]', '', slug)
     slug = re.sub(r'[-\s]+', '-', slug)
     # Remove leading/trailing hyphens
-    slug = slug.strip('-')
-    return slug
+    return slug.strip('-')
 
 
 def _build_hierarchy(sections: list[dict]) -> list[dict]:

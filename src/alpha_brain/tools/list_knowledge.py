@@ -2,6 +2,7 @@
 
 from alpha_brain.database import get_db
 from alpha_brain.knowledge_service import KnowledgeService
+from alpha_brain.time_service import TimeService
 
 
 async def list_knowledge(limit: int = 20) -> str:
@@ -33,7 +34,7 @@ async def list_knowledge(limit: int = 20) -> str:
                 f"• **{doc.title}** (`{doc.slug}`)\n"
                 f"  Sections: {section_count} | "
                 f"Size: {size_kb:.1f}KB | "
-                f"Updated: {doc.updated_at.strftime('%Y-%m-%d %H:%M')}"
+                f"Updated: {TimeService.format_age(doc.updated_at)}"
             )
         
         if len(documents) == limit:

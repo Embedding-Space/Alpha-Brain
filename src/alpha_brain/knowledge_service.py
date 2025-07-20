@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
 from uuid import UUID
 
 import structlog
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from alpha_brain.markdown_parser import parse_markdown_to_structure
@@ -48,8 +47,8 @@ class KnowledgeService:
             title=knowledge_input.title,
             content=knowledge_input.content,
             structure=structure,
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow()
+            created_at=datetime.now(tz=datetime.timezone.utc),
+            updated_at=datetime.now(tz=datetime.timezone.utc)
         )
         
         self.db.add(knowledge)
@@ -153,7 +152,7 @@ class KnowledgeService:
         knowledge.title = knowledge_input.title
         knowledge.content = knowledge_input.content
         knowledge.structure = structure
-        knowledge.updated_at = datetime.utcnow()
+        knowledge.updated_at = datetime.now(tz=datetime.timezone.utc)
         
         # If slug is changing, check it doesn't already exist
         if knowledge_input.slug != slug:
