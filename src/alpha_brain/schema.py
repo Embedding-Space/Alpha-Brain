@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -32,8 +32,8 @@ class Memory(Base):
     # Embeddings for search using pgvector
     semantic_embedding = Column(Vector(768))  # all-mpnet-base-v2 dimensions
     emotional_embedding = Column(
-        Vector(1024)
-    )  # ng3owb/sentiment-embedding-model dimensions
+        Vector(7)
+    )  # 7D emotion vector: anger, disgust, fear, joy, neutral, sadness, surprise
 
     # Extra data - flexible JSON field for metadata and future expansion
     extra_data = Column(JSON, default={})
@@ -93,26 +93,31 @@ class NaturalAnswer(BaseModel):
 
 class Knowledge(Base):
     """Structured knowledge document stored as parsed Markdown."""
-    
+
     __tablename__ = "knowledge"
-    
+
     # Core identity
     id = Column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
     slug = Column(String, nullable=False, unique=True, index=True)
-    
+
     # Document content
     title = Column(String, nullable=False)
     content = Column(Text, nullable=False)  # Raw Markdown
     structure = Column(JSON, nullable=False)  # Parsed structure
-    
+
     # Timestamps
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
+    updated_at = Column(
+        DateTime,
+        nullable=False,
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+    )
 
 
 class KnowledgeInput(BaseModel):
     """Input model for creating/updating knowledge."""
-    
+
     slug: str = Field(..., description="URL-friendly identifier")
     title: str = Field(..., description="Document title")
     content: str = Field(..., description="Markdown content")
@@ -120,7 +125,7 @@ class KnowledgeInput(BaseModel):
 
 class KnowledgeOutput(BaseModel):
     """Output model for retrieved knowledge."""
-    
+
     id: UUID
     slug: str
     title: str

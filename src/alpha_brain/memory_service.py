@@ -14,6 +14,7 @@ from alpha_brain.database import get_db
 from alpha_brain.embeddings import get_embedding_service
 from alpha_brain.helper import MemoryHelper
 from alpha_brain.schema import Memory, MemoryOutput
+from alpha_brain.splash_engine import get_splash_engine
 from alpha_brain.time_service import TimeService
 
 logger = get_logger()
@@ -22,10 +23,11 @@ logger = get_logger()
 class MemoryService:
     """Service for managing memories."""
 
-    def __init__(self, embedding_service=None, memory_helper=None):
+    def __init__(self, embedding_service=None, memory_helper=None, splash_engine=None):
         """Initialize the memory service."""
         self.embedding_service = embedding_service or get_embedding_service()
         self.memory_helper = memory_helper or MemoryHelper()
+        self.splash_engine = splash_engine or get_splash_engine()
 
     async def _analyze_memory_safe(self, content: str) -> dict[str, Any]:
         """Analyze memory with error handling, returns minimal metadata on failure."""
@@ -102,6 +104,19 @@ class MemoryService:
 
                 logger.info("Memory stored", memory_id=str(memory.id))
 
+                # Generate splash analysis for this memory
+                # TEMPORARY: Always use emotional mode for testing
+                splash_mode = "emotional"  # was: os.getenv("SPLASH_MODE", "semantic")
+
+                logger.info(f"Generating {splash_mode} splash analysis")
+                splash_analysis = await self.splash_engine.generate_splash(
+                    query_semantic_embedding=semantic_emb,
+                    query_emotional_embedding=emotional_emb,
+                    exclude_memory_id=memory.id,
+                    mode=splash_mode,
+                )
+                splash_output = self.splash_engine.format_splash_output(splash_analysis)
+
                 return {
                     "status": "stored",
                     "memory_id": str(memory.id),
@@ -113,6 +128,7 @@ class MemoryService:
                         "emotional_tone": metadata.get("emotional_tone", "neutral"),
                         "keywords": metadata.get("keywords", []),
                     },
+                    "splash": splash_output,
                 }
 
         except Exception as e:
@@ -270,10 +286,10 @@ class MemoryService:
     async def get_by_id(self, memory_id: UUID) -> MemoryOutput | None:
         """
         Get a specific memory by its ID.
-        
+
         Args:
             memory_id: The UUID of the memory
-            
+
         Returns:
             MemoryOutput if found, None otherwise
         """
@@ -285,17 +301,17 @@ class MemoryService:
                     Memory.created_at,
                     Memory.extra_data,
                 ).where(Memory.id == memory_id)
-                
+
                 result = await session.execute(stmt)
                 row = result.fetchone()
-                
+
                 if not row:
                     return None
-                
+
                 # Calculate age
                 created_at = pendulum.instance(row.created_at)
                 age = created_at.diff_for_humans()
-                
+
                 return MemoryOutput(
                     id=row.id,
                     content=row.content,
@@ -303,9 +319,11 @@ class MemoryService:
                     extra_data=row.extra_data or {},
                     age=age,
                 )
-                
+
         except Exception as e:
-            logger.error("Failed to get memory by ID", memory_id=str(memory_id), error=str(e))
+            logger.error(
+                "Failed to get memory by ID", memory_id=str(memory_id), error=str(e)
+            )
             return None
 
 

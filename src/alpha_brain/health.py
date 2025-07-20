@@ -3,7 +3,6 @@
 
 import asyncio
 import sys
-from typing import Optional
 
 from fastmcp import Client
 
@@ -11,11 +10,11 @@ from fastmcp import Client
 async def check_mcp_server(url: str, max_attempts: int = 30) -> bool:
     """
     Check if MCP server is ready by attempting to connect with FastMCP client.
-    
+
     Args:
         url: MCP server URL (e.g., "http://localhost:9100/mcp/")
         max_attempts: Maximum connection attempts before giving up
-        
+
     Returns:
         True if server is ready, False otherwise
     """
@@ -37,11 +36,11 @@ async def check_mcp_server(url: str, max_attempts: int = 30) -> bool:
     return False
 
 
-def main(url: Optional[str] = None) -> int:
+def main(url: str | None = None) -> int:
     """Main entry point for health check."""
     if url is None:
         url = sys.argv[1] if len(sys.argv) > 1 else "http://localhost:9100/mcp/"
-    
+
     print(f"Waiting for MCP server at {url}", end="", flush=True)
     success = asyncio.run(check_mcp_server(url))
     return 0 if success else 1

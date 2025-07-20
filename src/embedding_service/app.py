@@ -6,10 +6,11 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from sentence_transformers import SentenceTransformer
+from transformers import pipeline
 
 # Model names
 SEMANTIC_MODEL = "sentence-transformers/all-mpnet-base-v2"
-EMOTIONAL_MODEL = "ng3owb/sentiment-embedding-model"
+EMOTIONAL_MODEL = "j-hartmann/emotion-english-roberta-large"
 
 # Global model instances
 semantic_model = None
@@ -52,9 +53,14 @@ async def lifespan(app: FastAPI):
     semantic_model = SentenceTransformer(SEMANTIC_MODEL, device="cpu")
     print("Semantic model loaded")
 
-    # Load emotional model
+    # Load emotional model (7D emotion classifier)
     print(f"Loading emotional model: {EMOTIONAL_MODEL}")
-    emotional_model = SentenceTransformer(EMOTIONAL_MODEL, device="cpu")
+    emotional_model = pipeline(
+        "text-classification",
+        model=EMOTIONAL_MODEL,
+        return_all_scores=True,
+        device=-1,  # CPU
+    )
     print("Emotional model loaded")
 
     # Test models and warm them up
@@ -62,7 +68,9 @@ async def lifespan(app: FastAPI):
     print("Warming up models with test inference...")
     warmup_start = time.time()
     semantic_dim = len(semantic_model.encode(test_text))
-    emotional_dim = len(emotional_model.encode(test_text))
+    # For emotion model, test it differently
+    emotional_model(test_text)[0]  # Warm up the model
+    emotional_dim = 7  # Always 7 emotions
     warmup_time = time.time() - warmup_start
 
     load_time = time.time() - start_time
@@ -94,10 +102,26 @@ async def health():
         semantic_dim=semantic_model.get_sentence_embedding_dimension()
         if semantic_model
         else None,
-        emotional_dim=emotional_model.get_sentence_embedding_dimension()
-        if emotional_model
-        else None,
+        emotional_dim=7 if emotional_model else None,  # Always 7 emotions
     )
+
+
+def extract_emotion_vector(emotion_results):
+    """Extract 7D emotion vector from classifier results."""
+    # Order: anger, disgust, fear, joy, neutral, sadness, surprise
+    emotion_order = [
+        "anger",
+        "disgust",
+        "fear",
+        "joy",
+        "neutral",
+        "sadness",
+        "surprise",
+    ]
+    return [
+        next(r["score"] for r in emotion_results if r["label"] == emotion)
+        for emotion in emotion_order
+    ]
 
 
 @app.post("/embed", response_model=EmbedResponse)
@@ -113,8 +137,17 @@ async def embed(request: EmbedRequest):
         response.semantic = semantic_emb.tolist()
 
     if request.model_type in ["emotional", "both"]:
-        emotional_emb = emotional_model.encode(request.text)
-        response.emotional = emotional_emb.tolist()
+        # Truncate text for emotion model (max 512 tokens)
+        # Take first ~2000 chars to stay under token limit
+        truncated_text = (
+            request.text[:2000] if len(request.text) > 2000 else request.text
+        )
+
+        # Get emotion classification results
+        emotion_results = emotional_model(truncated_text)[0]
+        # Extract 7D vector
+        emotional_emb = extract_emotion_vector(emotion_results)
+        response.emotional = emotional_emb
 
     return response
 
@@ -132,8 +165,15 @@ async def embed_batch(texts: list[str], model_type: str = "both"):
         result["semantic"] = semantic_embs.tolist()
 
     if model_type in ["emotional", "both"]:
-        emotional_embs = emotional_model.encode(texts)
-        result["emotional"] = emotional_embs.tolist()
+        # Process each text through emotion classifier
+        emotional_embs = []
+        for text in texts:
+            # Truncate text for emotion model (max 512 tokens)
+            truncated_text = text[:2000] if len(text) > 2000 else text
+            emotion_results = emotional_model(truncated_text)[0]
+            emotion_vector = extract_emotion_vector(emotion_results)
+            emotional_embs.append(emotion_vector)
+        result["emotional"] = emotional_embs
 
     return result
 

@@ -18,20 +18,25 @@ RUN uv pip install --system --no-cache \
     fastapi \
     uvicorn \
     sentence-transformers \
+    transformers \
     numpy \
     pydantic \
-    httpx
+    httpx \
+    torch
 
 # Copy the embedding service code
 COPY src/embedding_service ./embedding_service
 
 # Pre-download models during build
 RUN python -c "from sentence_transformers import SentenceTransformer; \
-    model1 = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2'); \
-    model2 = SentenceTransformer('ng3owb/sentiment-embedding-model'); \
+    from transformers import pipeline; \
+    model1 = SentenceTransformer('sentence-transformers/all-mpnet-base-v2'); \
     model1.encode('test'); \
-    model2.encode('test'); \
-    print('Models pre-downloaded successfully')"
+    print('Semantic model pre-downloaded'); \
+    model2 = pipeline('text-classification', model='j-hartmann/emotion-english-roberta-large', return_all_scores=True, device=-1); \
+    model2('test'); \
+    print('Emotion model pre-downloaded'); \
+    print('All models pre-downloaded successfully')"
 
 # Expose port
 EXPOSE 8001

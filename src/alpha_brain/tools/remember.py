@@ -30,6 +30,11 @@ async def remember(content: str) -> str:
         if summary:
             prose_result += f"\n\nSummary: {summary}"
 
+        # Add splash analysis if available
+        splash = result.get("splash")
+        if splash:
+            prose_result += splash
+
         logger.info("remember_tool_returning_prose", prose=prose_result)
         return prose_result
 

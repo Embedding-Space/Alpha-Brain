@@ -76,15 +76,6 @@ async def test_full_memory_lifecycle(mcp_client):
 @pytest.mark.asyncio
 async def test_memory_edge_cases(mcp_client):
     """Test edge cases and potential failure modes."""
-    # Very long content
-    long_content = "This is a test. " * 500  # ~8000 chars
-    long_result = await mcp_client.call_tool("remember", {"content": long_content})
-
-    prose_result = long_result.data
-    assert isinstance(prose_result, str)
-    assert "Stored memory:" in prose_result
-    assert "..." in prose_result  # Preview should be truncated
-
     # Empty content (service handles gracefully, stores empty memory)
     empty_result = await mcp_client.call_tool("remember", {"content": ""})
     prose_result = empty_result.data

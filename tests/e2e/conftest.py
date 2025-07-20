@@ -20,9 +20,16 @@ def clean_database():
     # Run truncate commands via docker exec
     subprocess.run(
         [
-            "docker", "exec", "alpha-brain-test-postgres",
-            "psql", "-U", "alpha", "-d", "alpha_brain_test", "-c",
-            "TRUNCATE TABLE knowledge CASCADE; TRUNCATE TABLE memories CASCADE;"
+            "docker",
+            "exec",
+            "alpha-brain-test-postgres",
+            "psql",
+            "-U",
+            "alpha",
+            "-d",
+            "alpha_brain_test",
+            "-c",
+            "TRUNCATE TABLE knowledge CASCADE; TRUNCATE TABLE memories CASCADE;",
         ],
         check=False,  # Don't fail if tables don't exist yet
         capture_output=True,
