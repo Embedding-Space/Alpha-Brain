@@ -57,7 +57,7 @@ async def remember(
             # Extract the text content
             elif result.content and len(result.content) > 0:
                 text = result.content[0].text
-                console.print(text)
+                console.print(text, highlight=False)
             elif result.is_error:
                 console.print("[red]Error storing memory[/red]", style="bold red")
             else:
@@ -142,7 +142,7 @@ async def search(
             # Extract the text content
             elif result.content and len(result.content) > 0:
                 text = result.content[0].text
-                console.print(text)
+                console.print(text, highlight=False)
             elif result.is_error:
                 console.print("[red]Error searching memories[/red]", style="bold red")
             else:
@@ -185,7 +185,7 @@ async def health(
                     console.print(syntax)
                 except json.JSONDecodeError:
                     # Not JSON, just print as text
-                    console.print(text)
+                    console.print(text, highlight=False)
             elif result.is_error:
                 console.print("[red]Server health check failed[/red]", style="bold red")
             else:
@@ -241,7 +241,7 @@ async def get_memory_cmd(
 
             if result.content and len(result.content) > 0:
                 text = result.content[0].text
-                console.print(text)
+                console.print(text, highlight=False)
             elif result.is_error:
                 console.print("[red]Failed to get memory[/red]", style="bold red")
             else:
@@ -279,7 +279,7 @@ async def create_knowledge_cmd(
 
             if result.content and len(result.content) > 0:
                 text = result.content[0].text
-                console.print(text)
+                console.print(text, highlight=False)
             elif result.is_error:
                 console.print("[red]Failed to create knowledge[/red]", style="bold red")
             else:
@@ -313,7 +313,7 @@ async def get_knowledge_cmd(
 
             if result.content and len(result.content) > 0:
                 text = result.content[0].text
-                console.print(text)
+                console.print(text, highlight=False)
             elif result.is_error:
                 console.print("[red]Failed to get knowledge[/red]", style="bold red")
             else:
@@ -360,7 +360,7 @@ async def update_knowledge_cmd(
 
             if result.content and len(result.content) > 0:
                 text = result.content[0].text
-                console.print(text)
+                console.print(text, highlight=False)
             elif result.is_error:
                 console.print("[red]Failed to update knowledge[/red]", style="bold red")
             else:
@@ -388,7 +388,7 @@ async def list_knowledge_cmd(
 
             if result.content and len(result.content) > 0:
                 text = result.content[0].text
-                console.print(text)
+                console.print(text, highlight=False)
             elif result.is_error:
                 console.print("[red]Failed to list knowledge[/red]", style="bold red")
             else:
@@ -428,7 +428,7 @@ async def set_context_cmd(
 
             if result.content and len(result.content) > 0:
                 text = result.content[0].text
-                console.print(text)
+                console.print(text, highlight=False)
             elif result.is_error:
                 console.print("[red]Failed to set context[/red]", style="bold red")
             else:
@@ -464,7 +464,7 @@ async def whoami(
             # Extract the text content
             elif result.content and len(result.content) > 0:
                 text = result.content[0].text
-                console.print(text)
+                console.print(text, highlight=False)
             elif result.is_error:
                 console.print("[red]Error getting context[/red]", style="bold red")
             else:
@@ -529,7 +529,7 @@ async def add_identity_fact_cmd(
             
             if result.content and len(result.content) > 0:
                 text = result.content[0].text
-                console.print(text)
+                console.print(text, highlight=False)
             elif result.is_error:
                 console.print("[red]Failed to add identity fact[/red]", style="bold red")
             else:
