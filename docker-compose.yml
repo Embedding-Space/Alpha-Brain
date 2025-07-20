@@ -31,7 +31,8 @@ services:
     container_name: alpha-brain-embeddings
     networks:
       - alpha-brain-network
-    # No exposed ports - only internal access
+    ports:
+      - "8001:8001"  # Temporarily exposed for data import
     volumes:
       # Share model cache with host
       - ~/.cache/huggingface:/root/.cache/huggingface
@@ -76,7 +77,7 @@ services:
       start_period: 10s
     restart: unless-stopped
 
-  # Test containers - part of main stack but started separately
+  # Test containers - completely isolated from production
   test-postgres:
     image: pgvector/pgvector:pg17
     container_name: alpha-brain-test-postgres
@@ -84,9 +85,12 @@ services:
     environment:
       POSTGRES_USER: alpha
       POSTGRES_PASSWORD: brain
-      POSTGRES_DB: alpha_brain_test
+      POSTGRES_DB: alpha_brain_test  # Test database name
     networks:
       - alpha-brain-network
+    volumes:
+      # Mount our test data dump to auto-populate on startup
+      - ./.local/test_dataset.sql:/docker-entrypoint-initdb.d/10-test-data.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U alpha -d alpha_brain_test"]
       interval: 5s

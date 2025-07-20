@@ -11,6 +11,7 @@ ID: {{ memory.id }}
 Importance: {{ memory.marginalia.importance }}/5
 {% endif %}
 {% if memory.marginalia.entities %}
+
 Entities: {{ memory.marginalia.entities | join(", ") }}
 {% endif %}
 {% endif %}

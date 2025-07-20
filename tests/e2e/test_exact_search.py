@@ -28,7 +28,7 @@ async def test_exact_search(mcp_client):
     # Test 1: Search for exact phrase
     result = await mcp_client.call_tool(
         "search",
-        {"query": "premature optimization", "search_type": "exact", "limit": 5},
+        {"query": "premature optimization", "mode": "exact", "limit": 5},
     )
 
     prose_result = result.content[0].text
@@ -38,7 +38,7 @@ async def test_exact_search(mcp_client):
 
     # Test 2: Case insensitive search
     result = await mcp_client.call_tool(
-        "search", {"query": "ALPHA BRAIN", "search_type": "exact", "limit": 5}
+        "search", {"query": "ALPHA BRAIN", "mode": "exact", "limit": 5}
     )
 
     prose_result = result.content[0].text
@@ -47,7 +47,7 @@ async def test_exact_search(mcp_client):
 
     # Test 3: Partial word match
     result = await mcp_client.call_tool(
-        "search", {"query": "optim", "search_type": "exact", "limit": 5}
+        "search", {"query": "optim", "mode": "exact", "limit": 5}
     )
 
     prose_result = result.content[0].text
@@ -61,7 +61,7 @@ async def test_exact_search(mcp_client):
     # Test 5: Search returns nothing for non-existent text
     result = await mcp_client.call_tool(
         "search",
-        {"query": "xyzzy_nonexistent_text_12345", "search_type": "exact", "limit": 5},
+        {"query": "xyzzy_nonexistent_text_12345", "mode": "exact", "limit": 5},
     )
 
     prose_result = result.content[0].text
@@ -83,12 +83,12 @@ async def test_exact_vs_semantic_search(mcp_client):
 
     # Exact search for "optimize" (won't find "optimization")
     exact_result = await mcp_client.call_tool(
-        "search", {"query": "optimize", "search_type": "exact", "limit": 1}
+        "search", {"query": "optimize", "mode": "exact", "limit": 1}
     )
 
     # Semantic search for "optimize" (should find "optimization")
     semantic_result = await mcp_client.call_tool(
-        "search", {"query": "optimize", "search_type": "semantic", "limit": 1}
+        "search", {"query": "optimize", "mode": "semantic", "limit": 1}
     )
 
     # Exact search is literal - won't find variations

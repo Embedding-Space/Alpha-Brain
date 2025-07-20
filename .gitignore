@@ -1,5 +1,6 @@
 # Local development files
 *.env
+.local/
 
 # Python-generated files
 __pycache__/

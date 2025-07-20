@@ -90,9 +90,9 @@ async def test_memory_edge_cases(mcp_client):
     )
 
     # Search with different types
-    for search_type in ["semantic", "emotional"]:
+    for mode in ["semantic", "emotional"]:
         typed_result = await mcp_client.call_tool(
-            "search", {"query": "test", "search_type": search_type, "limit": 1}
+            "search", {"query": "test", "mode": mode, "limit": 1}
         )
         prose_result = typed_result.content[0].text
         assert isinstance(prose_result, str)

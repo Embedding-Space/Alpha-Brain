@@ -30,6 +30,7 @@ dependencies = [
     "redis>=6.2.0",
     "mistune>=3.0.0",
     "geocoder>=1.38.0",
+    "dateparser>=1.2.0",
 ]
 
 [project.scripts]

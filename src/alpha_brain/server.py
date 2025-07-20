@@ -6,6 +6,7 @@ from fastmcp import FastMCP
 from structlog import get_logger
 
 from alpha_brain.tools import (
+    add_alias,
     create_knowledge,
     get_knowledge,
     get_memory,
@@ -87,6 +88,9 @@ mcp = FastMCP(
     - update_knowledge() to modify existing documents
     - list_knowledge() to see all available documents
     
+    Entity Tools:
+    - add_alias() to teach the system about entity names and their aliases
+    
     This system combines:
     - Diary Brain: Experiential memories with emotional context
     - Encyclopedia Brain: Structured knowledge documents with sections
@@ -103,6 +107,7 @@ mcp.tool(create_knowledge)
 mcp.tool(get_knowledge)
 mcp.tool(update_knowledge)
 mcp.tool(list_knowledge)
+mcp.tool(add_alias)
 
 
 if __name__ == "__main__":

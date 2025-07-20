@@ -6,8 +6,16 @@ import pytest
 @pytest.mark.asyncio
 async def test_entity_search_prioritizes_exact_matches(mcp_client):
     """Entity matches should appear first with perfect similarity scores."""
-    # Store a memory with an entity
-    memory_with_entity = "Had lunch with Sparkle at the new cafe downtown"
+    # Create a unique test entity
+    test_entity = "TestEntityAware42"
+    result = await mcp_client.call_tool(
+        "add_alias", 
+        {"canonical_name": test_entity, "alias": test_entity}
+    )
+    assert not result.is_error
+    
+    # Store a memory with this entity
+    memory_with_entity = f"Had lunch with {test_entity} at the new cafe downtown"
     result = await mcp_client.call_tool("remember", {"content": memory_with_entity})
     assert not result.is_error
 
@@ -17,7 +25,7 @@ async def test_entity_search_prioritizes_exact_matches(mcp_client):
     assert not result.is_error
 
     # Search for the entity
-    result = await mcp_client.call_tool("search", {"query": "Sparkle"})
+    result = await mcp_client.call_tool("search", {"query": test_entity})
     assert not result.is_error
 
     output = result.content[0].text

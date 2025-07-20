@@ -99,9 +99,42 @@ async def test_entity_table_exists():
 @pytest.mark.asyncio
 async def test_entity_operations_via_mcp(mcp_client: Client):
     """Test entity operations through memory storage."""
-    # First, manually insert some test entities
-    insert_test_entity("Test Person E2E", ["TPE2E", "Test P"])
-    insert_test_entity("Test Project Alpha", ["TPA", "TestProj"])
+    # First, create test entities using add_alias
+    result = await mcp_client.call_tool(
+        "add_alias", 
+        {"canonical_name": "Test Person E2E", "alias": "Test Person E2E"}
+    )
+    assert not result.is_error
+    
+    result = await mcp_client.call_tool(
+        "add_alias", 
+        {"canonical_name": "Test Person E2E", "alias": "TPE2E"}
+    )
+    assert not result.is_error
+    
+    result = await mcp_client.call_tool(
+        "add_alias", 
+        {"canonical_name": "Test Person E2E", "alias": "Test P"}
+    )
+    assert not result.is_error
+    
+    result = await mcp_client.call_tool(
+        "add_alias", 
+        {"canonical_name": "Test Project Alpha", "alias": "Test Project Alpha"}
+    )
+    assert not result.is_error
+    
+    result = await mcp_client.call_tool(
+        "add_alias", 
+        {"canonical_name": "Test Project Alpha", "alias": "TPA"}
+    )
+    assert not result.is_error
+    
+    result = await mcp_client.call_tool(
+        "add_alias", 
+        {"canonical_name": "Test Project Alpha", "alias": "TestProj"}
+    )
+    assert not result.is_error
 
     # Store a memory mentioning these entities
     content = "Had a meeting with TPE2E about Test Project Alpha. Also mentioned Unknown Corp."
@@ -161,8 +194,12 @@ async def test_memory_with_all_unknown_entities(mcp_client: Client):
 @pytest.mark.asyncio
 async def test_canonicalization_with_aliases(mcp_client: Client):
     """Test that aliases properly resolve to canonical names."""
-    # Insert entity with multiple aliases
-    insert_test_entity("Sparkplug Louise Mittenhaver", ["Sparkle", "Sparks"])
+    # Add the missing alias to Sparkle
+    result = await mcp_client.call_tool(
+        "add_alias", 
+        {"canonical_name": "Sparkplug Louise Mittenhaver", "alias": "Sparks"}
+    )
+    assert not result.is_error
 
     # Store memories using different aliases
     memories = [
@@ -223,7 +260,7 @@ async def test_search_with_canonicalized_entities(mcp_client: Client):
 
     # Search for the canonical name
     result = await mcp_client.call_tool(
-        "search", {"query": "Jeffery Harrell architecture", "search_type": "semantic"}
+        "search", {"query": "Jeffery Harrell architecture", "mode": "semantic"}
     )
     assert not result.is_error
 

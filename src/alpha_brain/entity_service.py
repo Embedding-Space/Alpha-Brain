@@ -82,6 +82,41 @@ class EntityService:
                 "Entity added", canonical=canonical_name, alias_count=len(aliases)
             )
 
+    async def add_alias_to_entity(self, canonical_name: str, alias: str) -> None:
+        """
+        Add an alias to an existing entity.
+        
+        Args:
+            canonical_name: The canonical form of the entity
+            alias: The new alias to add
+        """
+        async with get_db() as session:
+            # Fetch the entity
+            stmt = select(Entity).where(Entity.canonical_name == canonical_name)
+            result = await session.execute(stmt)
+            entity = result.scalar_one_or_none()
+            
+            if not entity:
+                raise ValueError(f"Entity '{canonical_name}' not found")
+            
+            # Add alias if not already present
+            if alias not in entity.aliases:
+                entity.aliases = [*entity.aliases, alias]
+                await session.commit()
+                
+                logger.info(
+                    "Alias added", 
+                    canonical=canonical_name, 
+                    alias=alias,
+                    total_aliases=len(entity.aliases)
+                )
+            else:
+                logger.info(
+                    "Alias already exists", 
+                    canonical=canonical_name, 
+                    alias=alias
+                )
+    
     async def import_entities(self, entities: list[dict[str, Any]]) -> dict[str, Any]:
         """
         Import multiple entities from a batch.

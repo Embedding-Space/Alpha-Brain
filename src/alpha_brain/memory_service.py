@@ -12,7 +12,9 @@ from structlog import get_logger
 
 from alpha_brain.database import get_db
 from alpha_brain.embeddings import get_embedding_service
+from alpha_brain.entity_service import get_entity_service
 from alpha_brain.helper import MemoryHelper
+from alpha_brain.interval_parser import parse_interval
 from alpha_brain.schema import Memory, MemoryOutput
 from alpha_brain.splash_engine import get_splash_engine
 from alpha_brain.time_service import TimeService
@@ -135,30 +137,156 @@ class MemoryService:
                 "message": "Failed to store memory",
             }
 
-    async def search(  # noqa: PLR0912
-        self, query: str, search_type: str = "semantic", limit: int = 10
+    async def search(  # noqa: PLR0912, PLR0915
+        self,
+        query: str | None = None,
+        search_type: str = "semantic",
+        limit: int = 10,
+        offset: int = 0,
+        interval: str | None = None,
+        entity: str | None = None,
+        order: str = "auto"
     ) -> list[MemoryOutput]:
         """
-        Search memories using vector similarity or exact text match.
+        Search or browse memories with flexible filtering options.
 
         First checks for entity matches in marginalia, then performs vector search.
         Entity matches are boosted to the top of results.
 
         Args:
-            query: The search query
+            query: The search query. If None/empty, browse mode is activated.
             search_type: 'semantic', 'emotional', 'both', or 'exact'
             limit: Maximum results to return
+            offset: Number of results to skip for pagination
+            interval: Time interval filter (e.g., "yesterday", "past 3 hours")
+            entity: Entity name filter (will be canonicalized)
+            order: Sort order - 'asc', 'desc', or 'auto'
 
         Returns:
             List of matching memories with similarity scores
         """
         try:
             async with get_db() as session:
+                # Determine if we're in browse mode
+                is_browsing = not query or query in ["", "*", "%"]
+                
+                # Parse temporal interval if provided
+                start_dt, end_dt = None, None
+                if interval:
+                    start_dt, end_dt = parse_interval(interval)
+                    logger.info(
+                        "Parsed interval",
+                        interval=interval,
+                        start=start_dt.isoformat(),
+                        end=end_dt.isoformat()
+                    )
+                
+                # Canonicalize entity filter if provided
+                canonical_entity = None
+                if entity:
+                    entity_service = get_entity_service()
+                    result = await entity_service.canonicalize_names([entity])
+                    if result["entities"]:
+                        canonical_entity = result["entities"][0]
+                    else:
+                        # Entity not found, use as-is
+                        canonical_entity = entity
+                    logger.info(
+                        "Canonicalized entity",
+                        input=entity,
+                        canonical=canonical_entity
+                    )
+                
+                # Determine sort order
+                if order == "auto":
+                    if is_browsing and interval:
+                        # For past intervals (yesterday, last week), use chronological
+                        # For now-anchored (past 3 hours), use reverse chronological
+                        if any(word in interval.lower() for word in ["past", "ago", "last"]):
+                            actual_order = "desc"  # Newest first for recent intervals
+                        else:
+                            actual_order = "asc"   # Oldest first for past intervals
+                    else:
+                        actual_order = "desc"  # Default to newest first for search
+                else:
+                    actual_order = order
+                
+                # If browsing mode (no query), skip to filtered selection
+                if is_browsing:
+                    # Build base query for browsing
+                    stmt = select(
+                        Memory.id,
+                        Memory.content,
+                        Memory.created_at,
+                        Memory.marginalia,
+                    )
+                    
+                    # Apply temporal filter
+                    if start_dt and end_dt:
+                        stmt = stmt.where(
+                            Memory.created_at.between(start_dt, end_dt)
+                        )
+                    
+                    # Apply entity filter
+                    if canonical_entity:
+                        stmt = stmt.where(
+                            Memory.marginalia["entities"].op("@>")(
+                                [canonical_entity]
+                            )
+                        )
+                    
+                    # Apply ordering
+                    if actual_order == "asc":
+                        stmt = stmt.order_by(Memory.created_at.asc())
+                    else:
+                        stmt = stmt.order_by(Memory.created_at.desc())
+                    
+                    # Apply pagination
+                    stmt = stmt.limit(limit).offset(offset)
+                    
+                    # Execute and convert to MemoryOutput
+                    result = await session.execute(stmt)
+                    rows = result.fetchall()
+                    
+                    memories = []
+                    for row in rows:
+                        age = TimeService.format_age(row.created_at)
+                        memory_output = MemoryOutput(
+                            id=row.id,
+                            content=row.content,
+                            created_at=row.created_at,
+                            similarity_score=None,  # No similarity in browse mode
+                            marginalia=row.marginalia or {},
+                            age=age,
+                        )
+                        memories.append(memory_output)
+                    
+                    logger.info(
+                        "Browse mode results",
+                        count=len(memories),
+                        interval=interval,
+                        entity=entity
+                    )
+                    
+                    return memories
+                
+                # Search mode - continue with existing logic but add filters
                 # First, check for entity matches in marginalia
                 entity_matches = []
-                if search_type != "exact":
-                    # Look for the query in both entities and unknown_entities arrays
-                    # Using PostgreSQL's JSONB operators: ? checks if key exists, @> checks containment
+                if search_type != "exact" and query:
+                    # Try to canonicalize the query - it might be an entity alias
+                    entity_service = get_entity_service()
+                    result = await entity_service.canonicalize_names([query])
+                    search_entity = result["entities"][0] if result["entities"] else query
+                    
+                    logger.info(
+                        "Entity search canonicalization",
+                        query=query,
+                        canonical=search_entity
+                    )
+                    
+                    # Look for the canonicalized entity in entities array
+                    # For unknown_entities, still use the original query
                     entity_stmt = (
                         select(
                             Memory.id,
@@ -167,14 +295,28 @@ class MemoryService:
                             Memory.marginalia,
                         )
                         .where(
-                            # Check if query is in entities array OR unknown_entities array
-                            # Using JSONB containment operator @>
-                            (Memory.marginalia["entities"].op("@>")([query]))
+                            # Check if canonicalized name is in entities array
+                            # OR original query is in unknown_entities array
+                            (Memory.marginalia["entities"].op("@>")([search_entity]))
                             | (Memory.marginalia["unknown_entities"].op("@>")([query]))
                         )
-                        .order_by(Memory.created_at.desc())
-                        .limit(limit)
                     )
+                    
+                    # Apply temporal filter
+                    if start_dt and end_dt:
+                        entity_stmt = entity_stmt.where(
+                            Memory.created_at.between(start_dt, end_dt)
+                        )
+                    
+                    # Apply entity filter (in addition to query match)
+                    if canonical_entity and canonical_entity != query:
+                        entity_stmt = entity_stmt.where(
+                            Memory.marginalia["entities"].op("@>")(
+                                [canonical_entity]
+                            )
+                        )
+                    
+                    entity_stmt = entity_stmt.order_by(Memory.created_at.desc()).limit(limit)
 
                     entity_result = await session.execute(entity_stmt)
                     entity_rows = entity_result.fetchall()
@@ -207,14 +349,36 @@ class MemoryService:
                             Memory.marginalia,
                         )
                         .where(Memory.content.ilike(f"%{query}%"))
-                        .order_by(Memory.created_at.desc())
-                        .limit(limit)
                     )
+                    
+                    # Apply temporal filter
+                    if start_dt and end_dt:
+                        stmt = stmt.where(
+                            Memory.created_at.between(start_dt, end_dt)
+                        )
+                    
+                    # Apply entity filter
+                    if canonical_entity:
+                        stmt = stmt.where(
+                            Memory.marginalia["entities"].op("@>")(
+                                [canonical_entity]
+                            )
+                        )
+                    
+                    # Apply ordering based on actual_order
+                    if actual_order == "asc":
+                        stmt = stmt.order_by(Memory.created_at.asc())
+                    else:
+                        stmt = stmt.order_by(Memory.created_at.desc())
+                    
+                    # Apply pagination
+                    stmt = stmt.limit(limit).offset(offset)
 
                 else:
                     # Vector similarity search - need embeddings
+                    # We know query is not None here because we're not in browse mode
                     semantic_emb, emotional_emb = await self.embedding_service.embed(
-                        query
+                        query  # type: ignore
                     )
 
                     # Collect entity match IDs to exclude from vector search
@@ -236,6 +400,20 @@ class MemoryService:
                         # Exclude entity matches to avoid duplicates
                         if entity_match_ids:
                             stmt = stmt.where(~Memory.id.in_(entity_match_ids))
+                        
+                        # Apply temporal filter
+                        if start_dt and end_dt:
+                            stmt = stmt.where(
+                                Memory.created_at.between(start_dt, end_dt)
+                            )
+                        
+                        # Apply entity filter
+                        if canonical_entity:
+                            stmt = stmt.where(
+                                Memory.marginalia["entities"].op("@>")(
+                                    [canonical_entity]
+                                )
+                            )
 
                         stmt = stmt.order_by(
                             Memory.semantic_embedding.cosine_distance(
@@ -260,6 +438,20 @@ class MemoryService:
                         # Exclude entity matches to avoid duplicates
                         if entity_match_ids:
                             stmt = stmt.where(~Memory.id.in_(entity_match_ids))
+                        
+                        # Apply temporal filter
+                        if start_dt and end_dt:
+                            stmt = stmt.where(
+                                Memory.created_at.between(start_dt, end_dt)
+                            )
+                        
+                        # Apply entity filter
+                        if canonical_entity:
+                            stmt = stmt.where(
+                                Memory.marginalia["entities"].op("@>")(
+                                    [canonical_entity]
+                                )
+                            )
 
                         stmt = stmt.order_by(
                             Memory.emotional_embedding.cosine_distance(
@@ -294,6 +486,20 @@ class MemoryService:
                         # Exclude entity matches to avoid duplicates
                         if entity_match_ids:
                             stmt = stmt.where(~Memory.id.in_(entity_match_ids))
+                        
+                        # Apply temporal filter
+                        if start_dt and end_dt:
+                            stmt = stmt.where(
+                                Memory.created_at.between(start_dt, end_dt)
+                            )
+                        
+                        # Apply entity filter
+                        if canonical_entity:
+                            stmt = stmt.where(
+                                Memory.marginalia["entities"].op("@>")(
+                                    [canonical_entity]
+                                )
+                            )
 
                         stmt = stmt.order_by(avg_distance).limit(
                             limit - len(entity_matches)

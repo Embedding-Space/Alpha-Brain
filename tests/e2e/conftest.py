@@ -14,10 +14,13 @@ def mcp_url():
     return os.environ.get("MCP_TEST_URL", "http://localhost:9101/mcp/")
 
 
-@pytest.fixture(autouse=True)
-def clean_database():
-    """Clean the database before each test using docker exec."""
-    # Run truncate commands via docker exec
+@pytest.fixture(scope="module", autouse=True)
+def reset_test_database():
+    """Reset the database to known state at the start of each test module."""
+    # Reload the test dataset from the dump file
+    dump_file = "/docker-entrypoint-initdb.d/10-test-data.sql"
+    
+    # First truncate existing data
     subprocess.run(
         [
             "docker",
@@ -31,9 +34,31 @@ def clean_database():
             "-c",
             "TRUNCATE TABLE knowledge CASCADE; TRUNCATE TABLE memories CASCADE; TRUNCATE TABLE entities CASCADE;",
         ],
-        check=False,  # Don't fail if tables don't exist yet
+        check=False,
         capture_output=True,
     )
+    
+    # Then reload from dump (which now contains clean INSERT statements)
+    subprocess.run(
+        [
+            "docker",
+            "exec",
+            "alpha-brain-test-postgres",
+            "psql",
+            "-U",
+            "alpha",
+            "-d",
+            "alpha_brain_test",
+            "-f",
+            dump_file,
+        ],
+        check=False,
+        capture_output=True,
+    )
+    
+    yield  # Run the tests in the module
+    
+    # No cleanup needed - next module will reset
 
 
 @pytest.fixture
