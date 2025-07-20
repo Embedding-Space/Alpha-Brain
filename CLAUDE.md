@@ -18,10 +18,10 @@ Alpha Brain is a unified memory and knowledge system that represents the evoluti
 Alpha Brain embraces the principle that **models write JSON and read prose**:
 
 - **Tool inputs**: Structured (handled by MCP framework)
-- **Tool outputs**: Prose wrapped in JSON for human readability
-- Instead of `{"memory_id": "...", "similarity": 0.46}`, return narrative descriptions
-- Example: `"Found memory from 23 minutes ago (similarity: 0.46): 'The cat sat on the mat.'"`
-- This aligns with the prose-first philosophy and makes tools more conversational
+- **Tool outputs**: Jinja2 templates render structured data into human-readable prose
+- **Editable output**: All tool outputs use templates in `src/alpha_brain/templates/outputs/`
+- **Temporal grounding**: Every output includes current timestamp for AI model context
+- Example: Templates transform raw data into clean, scannable output with consistent formatting
 
 ### Entity Canonicalization
 
@@ -60,6 +60,7 @@ just lint        # Check code style with Ruff
 just fix         # Auto-fix style issues
 just dead        # Find unused code with Vulture
 just check       # Run ALL checks before committing (lint + dead + test)
+just validate    # Validate Python syntax and imports before Docker restart
 
 # Database operations
 just backup      # Creates timestamped .tar.gz with all data
@@ -97,6 +98,7 @@ just clean-cache # Clean Python cache files
 3. Store in Postgres with pgvector, including marginalia metadata
 4. Search returns memories with similarity scores and human-readable age
 5. Splash Engine provides associative memory resonance for serendipitous discovery
+6. Output templates format results with temporal grounding for AI models
 
 ### Knowledge Pipeline (Implemented)
 1. Write knowledge naturally in Markdown
@@ -114,6 +116,8 @@ just clean-cache # Clean Python cache files
 - **PydanticAI + Ollama**: Local entity extraction with configurable model (defaults to gemma3:4b)
 - **Pydantic Settings**: Environment validation (DATABASE_URL required)
 - **One-time service initialization**: Database and embedding services persist across MCP connections
+- **Jinja2 Templates**: User-editable output formatting with temporal grounding
+- **Splash Engine**: Asymmetric similarity search for memory resonance (our killer feature)
 
 ## Current Implementation State
 
@@ -128,6 +132,9 @@ just clean-cache # Clean Python cache files
 - **Markdown parsing**: Automatic structure extraction with sections and hierarchy
 - **Section retrieval**: Get specific sections by ID from knowledge documents
 - **Health checks**: Clean MCP ping-based health monitoring without log spam
+- **Template system**: Editable Jinja2 templates for all tool outputs
+- **Temporal grounding**: Current time included in all outputs for AI context
+- **Python validation**: Pre-flight import checking before Docker restart
 
 ### What's Next (TODOs)
 - Build unified search across memories and knowledge
@@ -142,7 +149,9 @@ just clean-cache # Clean Python cache files
 1. Create `src/alpha_brain/tools/new_tool.py`
 2. Export from `tools/__init__.py`
 3. Register in `server.py` with `mcp.tool(new_tool)`
-4. Restart with `just restart`
+4. Create output template in `src/alpha_brain/templates/outputs/new_tool_output.j2`
+5. Use `render_output("new_tool", **context)` to format output
+6. Restart with `just restart`
 
 ### Memory Service Pattern
 ```python
@@ -200,11 +209,22 @@ Optional:
 
 The "lickable" workflow Jeffery wanted:
 1. Make changes to code
-2. `just restart` (1 second)
+2. `just restart` (validates Python, then restarts in ~1 second)
 3. Test with MCP Inspector or `just test`
 4. No rebuilds, no waiting, no pain
 
 Use `just dev` for the tight loop: restart + watch logs.
+
+### Output Template Development
+1. Edit templates in `src/alpha_brain/templates/outputs/`
+2. Templates use Jinja2 syntax with custom filters:
+   - `format_time`: Full context with age
+   - `format_time_readable`: Human-readable datetime
+   - `format_time_age`: Relative time (e.g., "5 minutes ago")
+   - `format_time_full`: Complete datetime for AI temporal grounding
+   - `pluralize`: Simple pluralization
+3. Context always includes `current_time` for temporal grounding
+4. Use `{% ... %}` to preserve whitespace, avoid `{%- ... %}` unless you want to strip it
 
 ## TDD Manifesto (Test-Driven Development)
 

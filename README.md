@@ -17,16 +17,20 @@ This unified system enables Alpha to both remember experiences AND know things, 
 - **Prose-First Memory**: Store memories as natural language, not structured data
 - **Dual Embeddings**: Semantic and emotional dimensions for rich memory retrieval
 - **Local Helper Models**: Entity extraction and knowledge crystallization via local LLMs
+- **Splash Engine**: Associative memory resonance - when storing memories, discover related and contrasting memories
+- **Editable Templates**: All tool outputs use Jinja2 templates for customizable formatting
+- **Temporal Grounding**: Every output includes current timestamp to help AI models track time
 
 ## Architecture
 
 - **Storage**: PostgreSQL with separate schemas for memories and knowledge
 - **Embeddings**: 
-  - Semantic: sentence-transformers/all-MiniLM-L6-v2 (384D)
-  - Emotional: ng3owb/sentiment-embedding-model (1024D)
-- **Entity Extraction**: Local LLM (Llama 3.2) for processing prose
-- **Interface**: FastMCP 2 server over HTTP
+  - Semantic: sentence-transformers/all-mpnet-base-v2 (768D)
+  - Emotional: ng3owb/sentiment-embedding-model (7D categorical)
+- **Entity Extraction**: Local LLM (Llama 3.2) for processing prose with canonicalization
+- **Interface**: FastMCP 2 server over HTTP with one-time service initialization
 - **Knowledge Format**: STORE JSON, RENDER TO MARKDOWN
+- **Output Format**: Jinja2 templates with temporal grounding
 
 ## Development
 
