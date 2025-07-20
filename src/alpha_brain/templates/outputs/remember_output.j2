@@ -1,10 +1,6 @@
 Current time: {{ current_time | format_time_full }}
 
 ID: {{ memory_id }}
-{% if summary %}
-
-Summary: {{ summary }}
-{% endif %}
 {% if splash_analysis %}
 
 🌊 **Splash Analysis** - {{ splash_analysis.mode | capitalize }} resonance distribution

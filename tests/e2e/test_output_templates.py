@@ -19,14 +19,14 @@ async def test_remember_uses_template(mcp_client: Client):
     # The output should contain key elements we expect from a template
     # We don't care about exact formatting, just that the data is there
     assert "ID:" in output or "id:" in output, "Output should contain memory ID"
-    assert content in output, "Output should contain the original content"
+    # We intentionally don't echo back the content - the user already knows what they sent
 
     # Verify we can extract the memory ID
     match = re.search(r"[Ii][Dd]:\s*([a-f0-9-]+)", output)
     assert match, "Should be able to extract memory ID from output"
 
-    # Verify the template included the timestamp
-    assert "Created" in output or "created" in output or "Stored" in output
+    # The timestamp is included via 'Current time:' at the top
+    assert "Current time:" in output  # Always present due to temporal grounding
 
 
 @pytest.mark.asyncio
@@ -50,14 +50,17 @@ async def test_get_memory_uses_template(mcp_client: Client):
     assert memory_id in output, "Output should contain memory ID"
     assert content in output, "Output should contain content"
 
-    # Should have marginalia section (Helper should have analyzed it)
-    assert "Marginalia" in output or "marginalia" in output, (
-        "Should show marginalia section"
-    )
+    # Should show some analysis data - either entities or importance
+    # The template conditionally shows these based on what's in marginalia
+    assert (
+        "Entities:" in output
+        or "entities:" in output
+        or "Importance:" in output
+        or "importance:" in output
+    ), "Should show some marginalia data"
 
-    # Should include entities if Helper found any
-    if "Jeffery" in output or "Alpha" in output:
-        assert "Entities:" in output or "entities:" in output
+    # The template shows entities in the 'Entities:' line if found
+    # But we can't guarantee which entities will be found, so just check the content is there
 
 
 @pytest.mark.asyncio

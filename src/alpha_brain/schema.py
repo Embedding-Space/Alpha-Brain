@@ -8,7 +8,8 @@ from uuid import UUID, uuid4
 
 from pgvector.sqlalchemy import Vector
 from pydantic import BaseModel, Field
-from sqlalchemy import ARRAY, JSON, Column, DateTime, String, Text
+from sqlalchemy import ARRAY, Column, DateTime, String, Text
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import declarative_base
 
@@ -36,7 +37,7 @@ class Memory(Base):
     )  # 7D emotion vector: anger, disgust, fear, joy, neutral, sadness, surprise
 
     # Marginalia - Helper's annotations and glosses added to memories
-    marginalia = Column(JSON, default={})
+    marginalia = Column(JSONB, default={})
 
     # For future TTL support if we want ephemeral memories
     expires_at = Column(DateTime, nullable=True)
@@ -104,7 +105,7 @@ class Knowledge(Base):
     # Document content
     title = Column(String, nullable=False)
     content = Column(Text, nullable=False)  # Raw Markdown
-    structure = Column(JSON, nullable=False)  # Parsed structure
+    structure = Column(JSONB, nullable=False)  # Parsed structure
 
     # Timestamps
     created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))

@@ -2,7 +2,7 @@ Current time: {{ current_time | format_time_full }}
 
 {% for memory in memories %}
 ---
-{{ loop.index }}. {{ memory.age }} (similarity: {{ "%.2f" | format(memory.similarity_score) }}):
+{{ loop.index }}. {{ memory.age }}{% if memory.similarity_score is not none %} (similarity: {{ "%.2f" | format(memory.similarity_score) }}){% endif %}:
 
 {{ memory.content }}
 

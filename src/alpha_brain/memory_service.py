@@ -135,11 +135,14 @@ class MemoryService:
                 "message": "Failed to store memory",
             }
 
-    async def search(
+    async def search(  # noqa: PLR0912
         self, query: str, search_type: str = "semantic", limit: int = 10
     ) -> list[MemoryOutput]:
         """
         Search memories using vector similarity or exact text match.
+
+        First checks for entity matches in marginalia, then performs vector search.
+        Entity matches are boosted to the top of results.
 
         Args:
             query: The search query
@@ -151,6 +154,49 @@ class MemoryService:
         """
         try:
             async with get_db() as session:
+                # First, check for entity matches in marginalia
+                entity_matches = []
+                if search_type != "exact":
+                    # Look for the query in both entities and unknown_entities arrays
+                    # Using PostgreSQL's JSONB operators: ? checks if key exists, @> checks containment
+                    entity_stmt = (
+                        select(
+                            Memory.id,
+                            Memory.content,
+                            Memory.created_at,
+                            Memory.marginalia,
+                        )
+                        .where(
+                            # Check if query is in entities array OR unknown_entities array
+                            # Using JSONB containment operator @>
+                            (Memory.marginalia["entities"].op("@>")([query]))
+                            | (Memory.marginalia["unknown_entities"].op("@>")([query]))
+                        )
+                        .order_by(Memory.created_at.desc())
+                        .limit(limit)
+                    )
+
+                    entity_result = await session.execute(entity_stmt)
+                    entity_rows = entity_result.fetchall()
+
+                    # Convert entity matches to MemoryOutput with perfect similarity
+                    for row in entity_rows:
+                        age = TimeService.format_age(row.created_at)
+                        memory_output = MemoryOutput(
+                            id=row.id,
+                            content=row.content,
+                            created_at=row.created_at,
+                            similarity_score=1.0,  # Perfect score for entity matches
+                            marginalia=row.marginalia or {},
+                            age=age,
+                        )
+                        entity_matches.append(memory_output)
+
+                    logger.info(
+                        "Entity matches found",
+                        query=query,
+                        count=len(entity_matches),
+                    )
                 if search_type == "exact":
                     # Exact text search using ILIKE
                     stmt = (
@@ -171,48 +217,57 @@ class MemoryService:
                         query
                     )
 
+                    # Collect entity match IDs to exclude from vector search
+                    entity_match_ids = [m.id for m in entity_matches]
+
                     if search_type == "semantic":
                         # Semantic search using SQLAlchemy Vector distance methods
                         # pgvector provides cosine_distance method on Vector columns
-                        stmt = (
-                            select(
-                                Memory.id,
-                                Memory.content,
-                                Memory.created_at,
-                                Memory.marginalia,
-                                Memory.semantic_embedding.cosine_distance(
-                                    semantic_emb.tolist()
-                                ).label("distance"),
+                        stmt = select(
+                            Memory.id,
+                            Memory.content,
+                            Memory.created_at,
+                            Memory.marginalia,
+                            Memory.semantic_embedding.cosine_distance(
+                                semantic_emb.tolist()
+                            ).label("distance"),
+                        ).where(Memory.semantic_embedding.is_not(None))
+
+                        # Exclude entity matches to avoid duplicates
+                        if entity_match_ids:
+                            stmt = stmt.where(~Memory.id.in_(entity_match_ids))
+
+                        stmt = stmt.order_by(
+                            Memory.semantic_embedding.cosine_distance(
+                                semantic_emb.tolist()
                             )
-                            .where(Memory.semantic_embedding.is_not(None))
-                            .order_by(
-                                Memory.semantic_embedding.cosine_distance(
-                                    semantic_emb.tolist()
-                                )
-                            )
-                            .limit(limit)
-                        )
+                        ).limit(
+                            limit - len(entity_matches)
+                        )  # Adjust limit for entity matches
 
                     elif search_type == "emotional":
                         # Emotional search using SQLAlchemy Vector distance methods
-                        stmt = (
-                            select(
-                                Memory.id,
-                                Memory.content,
-                                Memory.created_at,
-                                Memory.marginalia,
-                                Memory.emotional_embedding.cosine_distance(
-                                    emotional_emb.tolist()
-                                ).label("distance"),
+                        stmt = select(
+                            Memory.id,
+                            Memory.content,
+                            Memory.created_at,
+                            Memory.marginalia,
+                            Memory.emotional_embedding.cosine_distance(
+                                emotional_emb.tolist()
+                            ).label("distance"),
+                        ).where(Memory.emotional_embedding.is_not(None))
+
+                        # Exclude entity matches to avoid duplicates
+                        if entity_match_ids:
+                            stmt = stmt.where(~Memory.id.in_(entity_match_ids))
+
+                        stmt = stmt.order_by(
+                            Memory.emotional_embedding.cosine_distance(
+                                emotional_emb.tolist()
                             )
-                            .where(Memory.emotional_embedding.is_not(None))
-                            .order_by(
-                                Memory.emotional_embedding.cosine_distance(
-                                    emotional_emb.tolist()
-                                )
-                            )
-                            .limit(limit)
-                        )
+                        ).limit(
+                            limit - len(entity_matches)
+                        )  # Adjust limit for entity matches
 
                     else:  # "both" or default
                         # Combined search - average of both distances
@@ -234,9 +289,15 @@ class MemoryService:
                             )
                             .where(Memory.semantic_embedding.is_not(None))
                             .where(Memory.emotional_embedding.is_not(None))
-                            .order_by(avg_distance)
-                            .limit(limit)
                         )
+
+                        # Exclude entity matches to avoid duplicates
+                        if entity_match_ids:
+                            stmt = stmt.where(~Memory.id.in_(entity_match_ids))
+
+                        stmt = stmt.order_by(avg_distance).limit(
+                            limit - len(entity_matches)
+                        )  # Adjust limit for entity matches
 
                 result = await session.execute(stmt)
                 rows = result.fetchall()
@@ -266,14 +327,22 @@ class MemoryService:
 
                     memories.append(memory_output)
 
+                # Combine entity matches (first) with vector search results
+                # Entity matches have perfect similarity and should appear first
+                combined_results = entity_matches + memories
+
                 logger.info(
                     "Search completed",
                     query=query,
                     search_type=search_type,
-                    results_count=len(memories),
+                    entity_matches=len(entity_matches),
+                    vector_matches=len(memories),
+                    total_results=len(combined_results),
                 )
 
-                return memories
+                return combined_results[
+                    :limit
+                ]  # Ensure we don't exceed requested limit
 
         except Exception as e:
             logger.error("Search failed", error=str(e))
@@ -312,6 +381,7 @@ class MemoryService:
                     id=row.id,
                     content=row.content,
                     created_at=row.created_at,
+                    similarity_score=None,  # Not from a search
                     marginalia=row.marginalia or {},
                     age=age,
                 )
