@@ -88,11 +88,12 @@ just clean-cache # Clean Python cache files
 3. Store in Postgres with pgvector
 4. Search returns memories with similarity scores and human-readable age
 
-### Knowledge Pipeline (Planned)
+### Knowledge Pipeline (Implemented)
 1. Write knowledge naturally in Markdown
-2. Parse to hierarchical JSON structure for storage
-3. Render back to Markdown with Jinja templates on retrieval
-4. Unified search across both memories and knowledge
+2. Parse to hierarchical JSON structure for storage using mistune
+3. Store in Postgres with structure preserved in JSONB column
+4. Retrieve full documents or specific sections by slug
+5. Unified search across both memories and knowledge (coming next)
 
 ### Key Technical Choices
 - **FastMCP 2**: HTTP transport (not stdio) to avoid model instance proliferation
@@ -112,13 +113,15 @@ just clean-cache # Clean Python cache files
 - Entity extraction via local Llama 3.2
 - E2E test infrastructure with separate test containers
 - Backup/restore workflow
+- **Knowledge management**: Full CRUD operations for Markdown documents
+- **Markdown parsing**: Automatic structure extraction with sections and hierarchy
+- **Section retrieval**: Get specific sections by ID from knowledge documents
 
 ### What's Next (TODOs)
-- Implement encyclopedia brain storage schema
-- Create knowledge ingestion and retrieval tools
 - Build unified search across memories and knowledge
 - Add "crystallize" function to extract knowledge from memories
-- Implement Markdown → JSON → Markdown pipeline
+- Add temporal search (memories from time period)
+- Add entity-based search (all memories about X)
 - CLI tool for dogfooding (`uv run alpha-brain remember`)
 
 ## Common Patterns
@@ -138,11 +141,18 @@ result = await service.remember(content)
 memories = await service.search(query, search_type="semantic")
 ```
 
+### Testing Philosophy
+- **E2E tests only**: No unit or integration tests - our code is primarily glue between services
+- Tests simulate real user workflows through MCP tools, not individual functions
+- Testing mocks would test the mocks, not the actual system behavior
+- All tests live in `tests/e2e/` and require full services running
+
 ### Testing Pattern
 - E2E tests use FastMCP client against separate test containers
 - Test containers share embedding service but have isolated database
 - Tests automatically wait for healthy containers via `wait_for_mcp.py`
 - Run tests with `just test` or single test with `just test-one <file>`
+- Tests focus on workflows: "user stores memory, then searches for it"
 
 ## Gotchas and Solutions
 

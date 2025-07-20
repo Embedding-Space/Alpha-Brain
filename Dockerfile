@@ -21,6 +21,9 @@ COPY src ./src
 # Install in editable mode so bind mounts work properly
 RUN uv pip install --system --no-cache -e .
 
+# Force Python to not use bytecode cache (helps with bind mount changes)
+ENV PYTHONDONTWRITEBYTECODE=1
+
 # Expose MCP HTTP port
 EXPOSE 9100
 

@@ -1,6 +1,6 @@
 """Tool for retrieving knowledge documents."""
 
-from alpha_brain.helper import get_db_async
+from alpha_brain.database import get_db
 from alpha_brain.knowledge_service import KnowledgeService
 from alpha_brain.markdown_parser import get_table_of_contents
 
@@ -15,7 +15,7 @@ async def get_knowledge(slug: str, section: str | None = None) -> str:
     Returns:
         The document content or section, formatted as Markdown
     """
-    async with get_db_async() as db:
+    async with get_db() as db:
         service = KnowledgeService(db)
         
         knowledge = await service.get_by_slug(slug)

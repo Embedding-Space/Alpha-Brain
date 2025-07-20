@@ -1,6 +1,6 @@
 """Tool for updating knowledge documents."""
 
-from alpha_brain.helper import get_db_async
+from alpha_brain.database import get_db
 from alpha_brain.knowledge_service import KnowledgeService
 from alpha_brain.schema import KnowledgeInput
 
@@ -17,7 +17,7 @@ async def update_knowledge(slug: str, title: str | None = None, content: str | N
     Returns:
         Confirmation message with update details
     """
-    async with get_db_async() as db:
+    async with get_db() as db:
         service = KnowledgeService(db)
         
         # Get existing document first

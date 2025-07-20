@@ -1,152 +1,11 @@
 """Markdown parser for converting documents to structured JSON."""
 
+from __future__ import annotations
+
 import re
 from typing import Any
 
 import mistune
-from mistune.renderers.rst import RSTRenderer
-
-
-class StructureExtractor:
-    """Custom Mistune renderer that extracts document structure."""
-    
-    def __init__(self):
-        self.sections = []
-        self.current_section = None
-        self.current_content = []
-        self.in_heading = False
-        
-    def heading(self, text: str, level: int) -> str:
-        """Process a heading."""
-        # Save previous section if exists
-        if self.current_section:
-            self.current_section["content"] = ''.join(self.current_content).strip()
-            self.sections.append(self.current_section)
-            self.current_content = []
-        
-        # Create new section
-        self.current_section = {
-            "level": level,
-            "title": text,
-            "content": "",
-            "id": _slugify(text)
-        }
-        
-        # Return empty string since we're extracting, not rendering
-        return ""
-    
-    def paragraph(self, text: str) -> str:
-        """Process a paragraph."""
-        self.current_content.append(text + "\n\n")
-        return ""
-    
-    def list(self, text: str, ordered: bool, start: int | None = None) -> str:
-        """Process a list."""
-        if ordered and start is not None:
-            self.current_content.append(f"{text}\n")
-        else:
-            self.current_content.append(f"{text}\n")
-        return ""
-    
-    def list_item(self, text: str, level: int) -> str:
-        """Process a list item."""
-        prefix = "  " * (level - 1)
-        return f"{prefix}- {text}\n"
-    
-    def block_code(self, code: str, info: str | None = None) -> str:
-        """Process a code block."""
-        if info:
-            self.current_content.append(f"```{info}\n{code}\n```\n\n")
-        else:
-            self.current_content.append(f"```\n{code}\n```\n\n")
-        return ""
-    
-    def block_quote(self, text: str) -> str:
-        """Process a blockquote."""
-        lines = text.strip().split('\n')
-        quoted = '\n'.join(f"> {line}" for line in lines)
-        self.current_content.append(f"{quoted}\n\n")
-        return ""
-    
-    def table(self, header: str, body: str) -> str:
-        """Process a table."""
-        self.current_content.append(f"{header}{body}\n")
-        return ""
-    
-    def finalize(self) -> list[dict]:
-        """Finalize and return all sections."""
-        # Don't forget the last section
-        if self.current_section:
-            self.current_section["content"] = ''.join(self.current_content).strip()
-            self.sections.append(self.current_section)
-        elif self.current_content:
-            # No headers found, treat entire content as one section
-            self.sections.append({
-                "level": 0,
-                "title": "Content",
-                "content": ''.join(self.current_content).strip(),
-                "id": "content"
-            })
-        
-        return self.sections
-
-
-class StructureRenderer(mistune.renderers.BaseRenderer):
-    """Mistune renderer that builds document structure."""
-    
-    def __init__(self):
-        super().__init__()
-        self.extractor = StructureExtractor()
-    
-    def heading(self, text: str, level: int) -> str:
-        return self.extractor.heading(text, level)
-    
-    def paragraph(self, text: str) -> str:
-        return self.extractor.paragraph(text)
-    
-    def list(self, text: str, ordered: bool, start: int | None = None) -> str:
-        return self.extractor.list(text, ordered, start)
-    
-    def list_item(self, text: str, level: int) -> str:
-        return self.extractor.list_item(text, level)
-    
-    def block_code(self, code: str, info: str | None = None) -> str:
-        return self.extractor.block_code(code, info)
-    
-    def block_quote(self, text: str) -> str:
-        return self.extractor.block_quote(text)
-    
-    def table(self, header: str, body: str) -> str:
-        return self.extractor.table(header, body)
-    
-    def text(self, text: str) -> str:
-        return text
-    
-    def emphasis(self, text: str) -> str:
-        return f"*{text}*"
-    
-    def strong(self, text: str) -> str:
-        return f"**{text}**"
-    
-    def link(self, text: str, url: str, title: str | None = None) -> str:
-        if title:
-            return f"[{text}]({url} \"{title}\")"
-        return f"[{text}]({url})"
-    
-    def image(self, text: str, url: str, title: str | None = None) -> str:
-        if title:
-            return f"![{text}]({url} \"{title}\")"
-        return f"![{text}]({url})"
-    
-    def inline_code(self, text: str) -> str:
-        return f"`{text}`"
-    
-    def linebreak(self) -> str:
-        return "\n"
-    
-    def thematic_break(self) -> str:
-        self.extractor.current_content.append("---\n\n")
-        return ""
 
 
 def parse_markdown_to_structure(content: str) -> dict[str, Any]:
@@ -158,17 +17,131 @@ def parse_markdown_to_structure(content: str) -> dict[str, Any]:
     Returns:
         Dictionary with document structure including sections and hierarchy
     """
-    # Create custom renderer
-    renderer = StructureRenderer()
+    # Create a markdown parser
+    markdown = mistune.create_markdown(renderer=None)
     
-    # Create markdown parser with our custom renderer
-    markdown = mistune.create_markdown(renderer=renderer)
+    # Parse to AST
+    tokens = markdown(content)
     
-    # Parse the content (this populates the renderer's sections)
-    markdown(content)
+    # Extract sections from tokens
+    sections = []
+    current_section = None
+    current_content = []
     
-    # Get sections from the renderer
-    sections = renderer.extractor.finalize()
+    def render_content(tokens_list):
+        """Render a list of tokens back to markdown."""
+        result = []
+        for token in tokens_list:
+            if token['type'] == 'paragraph':
+                result.append(render_inline(token['children']) + '\n')
+            elif token['type'] == 'list':
+                result.append(render_list(token) + '\n')
+            elif token['type'] == 'block_code':
+                attrs = token.get('attrs', {})
+                info = attrs.get('info', '')
+                code = token.get('raw', '').rstrip()
+                if info:
+                    result.append(f"```{info}\n{code}\n```\n")
+                else:
+                    result.append(f"```\n{code}\n```\n")
+            elif token['type'] == 'block_quote':
+                children_text = render_content(token['children'])
+                lines = children_text.strip().split('\n')
+                quoted = '\n'.join(f"> {line}" for line in lines)
+                result.append(quoted + '\n')
+            elif token['type'] == 'table':
+                result.append(render_table(token) + '\n')
+            elif token['type'] == 'thematic_break':
+                result.append('---\n')
+        return '\n'.join(result)
+    
+    def render_inline(children):
+        """Render inline tokens."""
+        result = []
+        for child in children:
+            if child['type'] == 'text':
+                result.append(child['raw'])
+            elif child['type'] == 'emphasis':
+                result.append(f"*{render_inline(child['children'])}*")
+            elif child['type'] == 'strong':
+                result.append(f"**{render_inline(child['children'])}**")
+            elif child['type'] == 'link':
+                text = render_inline(child['children'])
+                url = child['attrs']['url']
+                title = child['attrs'].get('title', '')
+                if title:
+                    result.append(f"[{text}]({url} \"{title}\")")
+                else:
+                    result.append(f"[{text}]({url})")
+            elif child['type'] == 'image':
+                text = child['attrs'].get('alt', '')
+                url = child['attrs']['url']
+                title = child['attrs'].get('title', '')
+                if title:
+                    result.append(f"![{text}]({url} \"{title}\")")
+                else:
+                    result.append(f"![{text}]({url})")
+            elif child['type'] == 'code_span':
+                result.append(f"`{child['raw']}`")
+            elif child['type'] == 'linebreak':
+                result.append('\n')
+        return ''.join(result)
+    
+    def render_list(token):
+        """Render a list."""
+        items = []
+        for item in token['children']:
+            # Extract text from list item's block_text children
+            item_texts = []
+            for child in item['children']:
+                if child['type'] == 'block_text':
+                    item_texts.append(render_inline(child['children']))
+                else:
+                    # Handle nested content
+                    item_texts.append(render_content([child]).strip())
+            
+            item_text = ''.join(item_texts)
+            items.append(f"- {item_text}")
+        return '\n'.join(items)
+    
+    def render_table(token):
+        """Render a table (simplified)."""
+        # For now, just indicate there's a table
+        return "[Table content]"
+    
+    # Process tokens
+    for token in tokens:
+        if token['type'] == 'heading':
+            # Save previous section if exists
+            if current_section:
+                current_section['content'] = render_content(current_content).strip()
+                sections.append(current_section)
+                current_content = []
+            
+            # Create new section
+            heading_text = render_inline(token['children'])
+            current_section = {
+                'level': token['attrs']['level'],
+                'title': heading_text,
+                'content': '',
+                'id': _slugify(heading_text)
+            }
+        else:
+            # Accumulate content
+            current_content.append(token)
+    
+    # Don't forget the last section
+    if current_section:
+        current_section['content'] = render_content(current_content).strip()
+        sections.append(current_section)
+    elif current_content:
+        # No headers found, treat entire content as one section
+        sections.append({
+            'level': 0,
+            'title': 'Content',
+            'content': render_content(current_content).strip(),
+            'id': 'content'
+        })
     
     structure = {
         "sections": sections,

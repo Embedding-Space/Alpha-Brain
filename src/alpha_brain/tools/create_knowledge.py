@@ -1,6 +1,6 @@
 """Tool for creating knowledge documents."""
 
-from alpha_brain.helper import get_db_async
+from alpha_brain.database import get_db
 from alpha_brain.knowledge_service import KnowledgeService
 from alpha_brain.schema import KnowledgeInput
 
@@ -16,7 +16,7 @@ async def create_knowledge(slug: str, title: str, content: str) -> str:
     Returns:
         Confirmation message with document details
     """
-    async with get_db_async() as db:
+    async with get_db() as db:
         service = KnowledgeService(db)
         
         try:

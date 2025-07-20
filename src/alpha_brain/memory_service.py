@@ -1,5 +1,7 @@
 """Memory service for ingestion and retrieval."""
 
+from __future__ import annotations
+
 import uuid
 from typing import Any
 from uuid import UUID

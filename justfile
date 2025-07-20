@@ -6,7 +6,7 @@ default:
 
 # Build Docker images
 build:
-    docker compose build --no-cache
+    docker compose build
 
 # Start the stack
 up:
@@ -156,6 +156,15 @@ test-one test_path:
     
     # Ensure test containers are up
     just test-up
+    
+    echo "⏳ Waiting for test MCP server to be ready..."
+    
+    # Use our wait_for_mcp script to check connectivity (3 attempts with retries)
+    if ! uv run python tests/wait_for_mcp.py http://localhost:9101/mcp/; then
+        echo "❌ Test MCP server is not responding!"
+        echo "Check logs with: docker logs alpha-brain-test-mcp"
+        exit 1
+    fi
     
     echo "🏃 Running specific test: {{test_path}}"
     
