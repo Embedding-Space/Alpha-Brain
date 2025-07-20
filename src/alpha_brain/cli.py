@@ -208,6 +208,154 @@ async def get_memory_cmd(
         sys.exit(1)
 
 
+@app.command(name="create-knowledge")
+async def create_knowledge_cmd(
+    slug: str,
+    title: str,
+    content: str,
+    server: str = DEFAULT_MCP_URL,
+) -> None:
+    """Create a new knowledge document.
+    
+    Args:
+        slug: URL-friendly identifier for the document
+        title: Document title
+        content: Markdown-formatted content (use '-' to read from stdin)
+        server: MCP server URL
+    """
+    try:
+        # Handle stdin input
+        if content == "-":
+            content = sys.stdin.read().strip()
+            
+        async with Client(server) as client:
+            result = await client.call_tool(
+                "create_knowledge", 
+                {"slug": slug, "title": title, "content": content}
+            )
+            
+            if result.content and len(result.content) > 0:
+                text = result.content[0].text
+                console.print(text)
+            elif result.is_error:
+                console.print("[red]Failed to create knowledge[/red]", style="bold red")
+            else:
+                console.print("[yellow]No content returned[/yellow]")
+    
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]", style="bold red")
+        sys.exit(1)
+
+
+@app.command(name="get-knowledge")
+async def get_knowledge_cmd(
+    slug: str,
+    section: str | None = None,
+    server: str = DEFAULT_MCP_URL,
+) -> None:
+    """Get a knowledge document by slug.
+    
+    Args:
+        slug: The slug identifier of the document
+        section: Optional section ID to retrieve only that section
+        server: MCP server URL
+    """
+    try:
+        async with Client(server) as client:
+            params = {"slug": slug}
+            if section:
+                params["section"] = section
+                
+            result = await client.call_tool("get_knowledge", params)
+            
+            if result.content and len(result.content) > 0:
+                text = result.content[0].text
+                console.print(text)
+            elif result.is_error:
+                console.print("[red]Failed to get knowledge[/red]", style="bold red")
+            else:
+                console.print("[yellow]No content returned[/yellow]")
+    
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]", style="bold red")
+        sys.exit(1)
+
+
+@app.command(name="update-knowledge")
+async def update_knowledge_cmd(
+    slug: str,
+    title: str | None = None,
+    content: str | None = None,
+    new_slug: str | None = None,
+    server: str = DEFAULT_MCP_URL,
+) -> None:
+    """Update an existing knowledge document.
+    
+    Args:
+        slug: Current slug of the document to update
+        title: New title (optional)
+        content: New Markdown content (optional, use '-' to read from stdin)
+        new_slug: New slug if renaming (optional)
+        server: MCP server URL
+    """
+    try:
+        # Handle stdin input
+        if content == "-":
+            content = sys.stdin.read().strip()
+            
+        # Build params with only provided values
+        params = {"slug": slug}
+        if title:
+            params["title"] = title
+        if content:
+            params["content"] = content
+        if new_slug:
+            params["new_slug"] = new_slug
+            
+        async with Client(server) as client:
+            result = await client.call_tool("update_knowledge", params)
+            
+            if result.content and len(result.content) > 0:
+                text = result.content[0].text
+                console.print(text)
+            elif result.is_error:
+                console.print("[red]Failed to update knowledge[/red]", style="bold red")
+            else:
+                console.print("[yellow]No content returned[/yellow]")
+    
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]", style="bold red")
+        sys.exit(1)
+
+
+@app.command(name="list-knowledge")
+async def list_knowledge_cmd(
+    limit: int = 20,
+    server: str = DEFAULT_MCP_URL,
+) -> None:
+    """List all knowledge documents.
+    
+    Args:
+        limit: Maximum number of documents to return
+        server: MCP server URL
+    """
+    try:
+        async with Client(server) as client:
+            result = await client.call_tool("list_knowledge", {"limit": limit})
+            
+            if result.content and len(result.content) > 0:
+                text = result.content[0].text
+                console.print(text)
+            elif result.is_error:
+                console.print("[red]Failed to list knowledge[/red]", style="bold red")
+            else:
+                console.print("[yellow]No content returned[/yellow]")
+    
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]", style="bold red")
+        sys.exit(1)
+
+
 def main():
     """Entry point for the CLI."""
     app()
