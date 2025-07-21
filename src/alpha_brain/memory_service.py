@@ -13,8 +13,8 @@ from structlog import get_logger
 from alpha_brain.database import get_db
 from alpha_brain.embeddings import get_embedding_service
 from alpha_brain.entity_service import get_entity_service
-from alpha_brain.memory_helper import MemoryHelper
 from alpha_brain.interval_parser import parse_interval
+from alpha_brain.memory_helper import MemoryHelper
 from alpha_brain.schema import Memory, MemoryOutput
 from alpha_brain.splash_engine import get_splash_engine
 from alpha_brain.time_service import TimeService

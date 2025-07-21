@@ -70,8 +70,9 @@ async def remember(
 
 @app.command
 async def search(
-    query: str,
+    query: str | None = None,
     limit: int = 10,
+    interval: str | None = None,
     server: str = DEFAULT_MCP_URL,
     raw: bool = False,
 ) -> None:
@@ -80,19 +81,32 @@ async def search(
     Automatically analyzes your query emotion and chooses the best search strategy:
     - Neutral queries: Full-text + Semantic search
     - Emotional queries: Full-text + Semantic + Emotional search
+    - Browse mode: Use --interval without query to browse memories from a time period
     
     Args:
-        query: The search query
+        query: The search query (optional for browse mode)
         limit: Maximum number of results per search type
+        interval: Time interval to filter by (e.g., "yesterday", "past 3 hours")
         server: MCP server URL
         raw: Show raw output without formatting
+    
+    Examples:
+        uv run alpha-brain search "Project Alpha"
+        uv run alpha-brain search --interval yesterday
+        uv run alpha-brain search "debugging" --interval "past 3 days"
     """
     try:
-        # Build parameters
-        params = {
-            "query": query,
-            "limit": limit
-        }
+        # Build parameters - only include non-None values
+        params = {"limit": limit}
+        if query is not None:
+            params["query"] = query
+        if interval is not None:
+            params["interval"] = interval
+        
+        # Validate arguments
+        if query is None and interval is None:
+            console.print("[red]Error: Must provide either query or interval[/red]", style="bold red")
+            sys.exit(1)
         
         async with Client(server) as client:
             result = await client.call_tool("search", params)

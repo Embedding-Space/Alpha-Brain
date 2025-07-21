@@ -60,7 +60,7 @@ async def test_entity_ids_with_known_entities(mcp_client):
     # Check entity processing
     assert "entity_ids" in marginalia, "Should have entity_ids field"
     assert len(marginalia["entity_ids"]) == 2, "Should have 2 entity IDs for known entities"
-    assert all(isinstance(id, int) for id in marginalia["entity_ids"]), "Entity IDs should be integers"
+    assert all(isinstance(entity_id, int) for entity_id in marginalia["entity_ids"]), "Entity IDs should be integers"
     
     # Known entities should be canonicalized
     assert "Test Person" in marginalia["entities"], "Should have canonicalized Test Person"
@@ -117,11 +117,11 @@ async def test_retroactive_alias_resolution(mcp_client):
     assert len(marginalia["entity_ids"]) == 0, "Should have no entity IDs yet"
     
     # Search for DaveSmith - should not find it via entity search
-    search_before = await mcp_client.call_tool("search", {
-        "query": "David Smith",
-        "limit": 5
-    })
-    search_text_before = search_before.content[0].text
+    # search_before = await mcp_client.call_tool("search", {
+    #     "query": "David Smith",
+    #     "limit": 5
+    # })
+# search_text_before = search_before.content[0].text
     # It might find it via text search, but not as an entity match
     
     # Now add David Smith as an entity with DaveSmith as an alias

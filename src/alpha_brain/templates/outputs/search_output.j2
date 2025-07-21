@@ -1,7 +1,7 @@
 {{ current_time }}
 
-Query emotion: {{ dominant_emotion }} ({{ "%.3f"|format(dominant_score) }}) | Neutral similarity: {{ "%.3f"|format(neutral_similarity) }}
-Search mode: {{ search_mode }}
+{% if search_mode != "browse" and dominant_emotion %}Query emotion: {{ dominant_emotion }} ({{ "%.3f"|format(dominant_score) }}) | Neutral similarity: {{ "%.3f"|format(neutral_similarity) }}
+{% endif %}Search mode: {{ search_mode }}
 
 {% if entity %}
 ## Entity
@@ -58,7 +58,7 @@ ID: {{ memory.id }}
 
 {% for memory in semantic_memories %}
 ---
-{{ loop.index }}. {{ memory.age }} (similarity: {{ "%.2f"|format(memory.similarity_score) }}):
+{{ loop.index }}. {{ memory.age }}{% if memory.similarity_score is not none %} (similarity: {{ "%.2f"|format(memory.similarity_score) }}){% endif %}:
 
 {{ memory.content }}
 
@@ -66,6 +66,21 @@ ID: {{ memory.id }}
 {% endfor %}
 {% elif not entity and not knowledge and not fulltext_memories %}
 No results found for "{{ query }}"
+{% endif %}
+{% elif search_mode == "browse" %}
+{% if semantic_memories %}
+
+## {{ query | title }}
+{% for memory in semantic_memories %}
+---
+{{ loop.index }}. {{ memory.age }}{% if memory.similarity_score is not none %} (similarity: {{ "%.2f"|format(memory.similarity_score) }}){% endif %}:
+
+{{ memory.content }}
+
+ID: {{ memory.id }}
+{% endfor %}
+{% else %}
+No memories found for {{ query.lower() }}
 {% endif %}
 {% else %}
 {% if semantic_memories %}
@@ -78,7 +93,7 @@ No results found for "{{ query }}"
 
 {% for memory in semantic_memories %}
 ---
-{{ loop.index }}. {{ memory.age }} (similarity: {{ "%.2f"|format(memory.similarity_score) }}):
+{{ loop.index }}. {{ memory.age }}{% if memory.similarity_score is not none %} (similarity: {{ "%.2f"|format(memory.similarity_score) }}){% endif %}:
 
 {{ memory.content }}
 
@@ -95,7 +110,7 @@ ID: {{ memory.id }}
 
 {% for memory in emotional_memories %}
 ---
-{{ loop.index }}. {{ memory.age }} (similarity: {{ "%.2f"|format(memory.similarity_score) }}):
+{{ loop.index }}. {{ memory.age }}{% if memory.similarity_score is not none %} (similarity: {{ "%.2f"|format(memory.similarity_score) }}){% endif %}:
 
 {{ memory.content }}
 

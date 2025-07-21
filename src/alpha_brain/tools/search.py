@@ -7,9 +7,8 @@ from sqlalchemy import select, text
 
 from alpha_brain.database import get_db
 from alpha_brain.embeddings import get_embedding_service
-from alpha_brain.entity_service import get_entity_service
 from alpha_brain.memory_service import get_memory_service
-from alpha_brain.schema import Entity, Knowledge, Memory
+from alpha_brain.schema import Entity, Knowledge, Memory, MemoryOutput
 from alpha_brain.templates import render_output
 from alpha_brain.time_service import TimeService
 
@@ -35,9 +34,9 @@ def extract_first_paragraph(content: str) -> str:
                     break
                 if next_line.startswith('#'):  # Header = end of paragraph
                     break
-                if next_line.startswith('-') or next_line.startswith('*'):  # Bullet list = end of paragraph
+                if next_line.startswith(('-', '*')):  # Bullet list = end of paragraph
                     break
-                if next_line.startswith('1.') or next_line.startswith('2.'):  # Numbered list = end
+                if next_line.startswith(('1.', '2.')):  # Numbered list = end
                     break
                 paragraph_lines.append(next_line)
             
@@ -55,24 +54,79 @@ PURE_NEUTRAL = np.array([0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0])
 EMOTIONAL_THRESHOLD = 0.8  # If neutral similarity < 0.8, include emotional search
 
 
-async def search(ctx: Context, query: str, limit: int = 10) -> str:
+async def search(ctx: Context, query: str | None = None, limit: int = 10, interval: str | None = None) -> str:
     """
     Adaptive search that analyzes query emotion and chooses appropriate strategy.
     
-    - Neutral queries (similarity > 0.8): Semantic search only
+    - Neutral queries (similarity > 0.8): Semantic search only  
     - Emotional queries: Both semantic and emotional search, presented separately
+    - No query (browse mode): Returns memories from specified interval
     
     Args:
         ctx: MCP context
-        query: The search query
+        query: The search query (optional for browse mode)
         limit: Maximum number of results per search type
+        interval: Time interval to filter by (e.g., "yesterday", "past 3 hours")
         
     Returns:
         Formatted search results with appropriate sections
     """
-    # Wall 1: Check for entity matches (always do this)
+    # Handle browse mode (no query, just interval) 
+    if not query and interval:
+        # Browse mode - get memories directly from database without embeddings
+        from alpha_brain.interval_parser import parse_interval
+        
+        try:
+            start_time, end_time = parse_interval(interval)
+            
+            async with get_db() as session:
+                stmt = select(Memory).where(
+                    Memory.created_at >= start_time,
+                    Memory.created_at <= end_time
+                ).order_by(Memory.created_at.desc()).limit(limit)
+                
+                result = await session.execute(stmt)
+                raw_memories = result.scalars().all()
+                
+                # Convert to MemoryOutput format
+                memories = []
+                for memory in raw_memories:
+                    memories.append(MemoryOutput(
+                        id=memory.id,
+                        content=memory.content,
+                        created_at=memory.created_at,
+                        similarity_score=None,
+                        marginalia=memory.marginalia,
+                        age=TimeService.format_age(memory.created_at)
+                    ))
+            
+            # Return simple browse results
+            return render_output(
+                "search", 
+                query=f"Browse {interval}",
+                entity=None,
+                knowledge_title_match=None,
+                knowledge_fulltext_matches=[],
+                fulltext_memories=[],
+                semantic_memories=memories,
+                emotional_memories=[],
+                semantic_warning=None,
+                emotional_warning=None,
+                search_mode="browse",
+                neutral_similarity=None,
+                dominant_emotion=None, 
+                dominant_score=None,
+                current_time=TimeService.format_full(TimeService.now())
+            )
+        except Exception as e:
+            return f"Browse mode error: {e!s}"
+    
+    # Require query for all other modes
+    if not query:
+        raise ValueError("Query parameter is required unless using browse mode with interval")
+
+    # Wall 1: Check for entity matches (only if we have a query)
     entity_match = None
-    entity_service = get_entity_service()
     
     # Try exact match first (canonical name or alias)
     async with get_db() as session:
@@ -160,7 +214,6 @@ async def search(ctx: Context, query: str, limit: int = 10) -> str:
         rows = result.fetchall()
         
         for row in rows:
-            from alpha_brain.schema import MemoryOutput
             memory = MemoryOutput(
                 id=row.id,
                 content=row.content,
