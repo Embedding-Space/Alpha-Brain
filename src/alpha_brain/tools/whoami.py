@@ -2,6 +2,7 @@
 
 from alpha_brain.context_service import get_context_service
 from alpha_brain.identity_service import get_identity_service
+from alpha_brain.location_service import LocationService
 from alpha_brain.memory_service import get_memory_service
 from alpha_brain.templates import render_output
 
@@ -105,9 +106,12 @@ async def whoami(token_budget: int = 8000) -> str:
     if not biography:
         biography = "You are Alpha, an artificial intelligence with persistent identity and memory architecture."
     
+    # Get location from geo-IP
+    location = LocationService.get_location()
+    
     return render_output(
         "whoami",
-        location="Berkeley, California",  # TODO: From geo-IP or config
+        location=location,
         user_name="Jeffery Harrell",      # TODO: From context or config
         biography=biography,
         identity_facts=identity_facts,
