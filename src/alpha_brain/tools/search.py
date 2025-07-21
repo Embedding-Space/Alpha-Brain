@@ -14,6 +14,39 @@ from alpha_brain.templates import render_output
 from alpha_brain.time_service import TimeService
 
 
+def extract_first_paragraph(content: str) -> str:
+    """Extract the first paragraph from markdown content.
+    
+    Skips headers and returns the first actual paragraph of text.
+    """
+    lines = content.strip().split('\n')
+    
+    # Find the first non-header, non-empty line
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        if stripped and not stripped.startswith('#'):
+            # Found start of first paragraph
+            paragraph_lines = [stripped]
+            
+            # Continue collecting lines until we hit a blank line or end
+            for j in range(i + 1, len(lines)):
+                next_line = lines[j].strip()
+                if not next_line:  # Blank line = end of paragraph
+                    break
+                if next_line.startswith('#'):  # Header = end of paragraph
+                    break
+                if next_line.startswith('-') or next_line.startswith('*'):  # Bullet list = end of paragraph
+                    break
+                if next_line.startswith('1.') or next_line.startswith('2.'):  # Numbered list = end
+                    break
+                paragraph_lines.append(next_line)
+            
+            return ' '.join(paragraph_lines)
+    
+    # Fallback if no paragraph found
+    return content[:300] + "..." if len(content) > 300 else content
+
+
 # Pure neutral vector for comparison
 # Format: [anger, disgust, fear, joy, neutral, sadness, surprise]
 PURE_NEUTRAL = np.array([0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0])
@@ -66,9 +99,50 @@ async def search(ctx: Context, query: str, limit: int = 10) -> str:
                 "first_seen": TimeService.format_for_context(entity.first_seen),
             }
     
-    # Wall 2: Check for knowledge matches
-    knowledge_match = None
-    # TODO: Implement knowledge search when we have the Knowledge model ready
+    # Wall 2: Check for knowledge matches (title first, then full-text)
+    knowledge_title_match = None
+    knowledge_fulltext_matches = []
+    
+    async with get_db() as session:
+        # First check for exact title match (case-insensitive)
+        stmt = select(Knowledge).where(
+            Knowledge.title.ilike(query)
+        )
+        result = await session.execute(stmt)
+        knowledge = result.scalar_one_or_none()
+        
+        if knowledge:
+            knowledge_title_match = {
+                "id": knowledge.id,
+                "slug": knowledge.slug,
+                "title": knowledge.title,
+                "first_paragraph": extract_first_paragraph(knowledge.content),
+                "created_at": TimeService.format_for_context(knowledge.created_at),
+            }
+        
+        # Also do full-text search on knowledge
+        if not knowledge_title_match:  # Only if we didn't get exact title match
+            stmt = text("""
+                SELECT id, slug, title, content, created_at,
+                       ts_headline('english', content, plainto_tsquery('english', :query), 
+                                  'MaxFragments=2, FragmentDelimiter=…, MaxWords=40, MinWords=10') as headline
+                FROM knowledge
+                WHERE search_vector @@ plainto_tsquery('english', :query)
+                ORDER BY ts_rank_cd(search_vector, plainto_tsquery('english', :query)) DESC
+                LIMIT :limit
+            """)
+            
+            result = await session.execute(stmt, {"query": query, "limit": limit})
+            rows = result.fetchall()
+            
+            for row in rows:
+                knowledge_fulltext_matches.append({
+                    "id": row.id,
+                    "slug": row.slug,
+                    "title": row.title,
+                    "headline": row.headline,
+                    "created_at": TimeService.format_for_context(row.created_at),
+                })
     
     # Wall 3: Full-text search for exact word matches
     fulltext_memories = []
@@ -178,7 +252,8 @@ async def search(ctx: Context, query: str, limit: int = 10) -> str:
         "search",
         query=query,
         entity=entity_match,
-        knowledge=knowledge_match,
+        knowledge_title_match=knowledge_title_match,
+        knowledge_fulltext_matches=knowledge_fulltext_matches,
         fulltext_memories=deduped_fulltext,
         semantic_memories=deduped_semantic,
         emotional_memories=deduped_emotional,

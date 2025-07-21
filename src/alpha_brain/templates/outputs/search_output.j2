@@ -11,13 +11,28 @@ Search mode: {{ search_mode }}
 {% if entity.aliases %}Also known as: {{ entity.aliases | join(', ') }}{% endif %}
 
 {% endif %}
-{% if knowledge %}
+{% if knowledge_title_match %}
 
-## Knowledge
+## Knowledge (Title Match)
 
-**{{ knowledge.title }}**
-{{ knowledge.summary }}
+**[{{ knowledge_title_match.title }}]({{ knowledge_title_match.slug }})**
 
+{{ knowledge_title_match.first_paragraph }}
+
+Created: {{ knowledge_title_match.created_at }}
+{% endif %}
+{% if knowledge_fulltext_matches %}
+
+## Knowledge Documents
+
+{% for doc in knowledge_fulltext_matches %}
+---
+{{ loop.index }}. **[{{ doc.title }}]({{ doc.slug }})**
+
+{{ doc.headline }}
+
+Created: {{ doc.created_at }}
+{% endfor %}
 {% endif %}
 {% if fulltext_memories %}
 
