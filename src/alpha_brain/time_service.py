@@ -220,6 +220,6 @@ class TimeService:
             Full datetime string with timezone
         """
         parsed = cls.parse(dt)
-        date_time_part = parsed.format("MMMM D, YYYY [at] h:mm A")
+        date_time_part = parsed.format("dddd, MMMM D, YYYY [at] h:mm A")
         tz_abbr = parsed.format("zz")
         return f"{date_time_part} {tz_abbr}"
