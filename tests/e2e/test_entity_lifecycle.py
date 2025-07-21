@@ -65,7 +65,7 @@ def insert_test_entity(canonical_name: str, aliases: list[str]):
     aliases = [a.replace("'", "''") for a in aliases]
 
     aliases_str = "{" + ",".join(f'"{a}"' for a in aliases) + "}"
-    cmd = f"INSERT INTO entities (canonical_name, aliases, created_at, updated_at) VALUES ('{canonical_name}', '{aliases_str}', NOW(), NOW()) ON CONFLICT DO NOTHING;"
+    cmd = f"INSERT INTO entities (canonical_name, aliases, first_seen, last_seen) VALUES ('{canonical_name}', '{aliases_str}', NOW(), NOW()) ON CONFLICT DO NOTHING;"
 
     subprocess.run(
         [
