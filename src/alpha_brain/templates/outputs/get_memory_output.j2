@@ -14,4 +14,18 @@ Importance: {{ memory.marginalia.importance }}/5
 
 Entities: {{ memory.marginalia.entities | join(", ") }}
 {% endif %}
+{% if memory.marginalia.unknown_entities %}
+
+Unknown entities: {{ memory.marginalia.unknown_entities | join(", ") }}
+{% endif %}
+{% if memory.marginalia.keywords %}
+
+Keywords: {{ memory.marginalia.keywords | join(", ") }}
+{% endif %}
+{% if memory.marginalia.summary %}
+
+Summary: {{ memory.marginalia.summary }}
+{% endif %}
+
+Full marginalia: {{ memory.marginalia }}
 {% endif %}

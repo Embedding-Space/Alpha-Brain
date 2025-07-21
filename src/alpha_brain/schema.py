@@ -13,6 +13,7 @@ from sqlalchemy import (
     DECIMAL,
     Column,
     DateTime,
+    Integer,
     Interval,
     String,
     Text,
@@ -49,6 +50,9 @@ class Memory(Base):
 
     # Marginalia - Helper's annotations and glosses added to memories
     marginalia = Column(JSONB, default={})
+    
+    # Entity IDs - normalized references to entities table
+    entity_ids = Column(ARRAY(Integer), default=[])
 
     # For future TTL support if we want ephemeral memories
     expires_at = Column(DateTime, nullable=True)
@@ -153,11 +157,22 @@ class Entity(Base):
 
     __tablename__ = "entities"
 
-    # Use canonical name as primary key - it's unique and meaningful
-    canonical_name = Column(String, primary_key=True)
+    # Primary key - integer for efficient foreign keys
+    id = Column(Integer, primary_key=True)
+    
+    # Canonical name - unique and meaningful
+    canonical_name = Column(String, nullable=False, unique=True, index=True)
 
     # Array of aliases that resolve to this canonical name
     aliases = Column(ARRAY(String), nullable=False, default=[])
+    
+    # Entity metadata
+    entity_type = Column(String)  # 'person', 'place', 'project', 'company', 'cat', etc.
+    description = Column(Text)  # Brief description for whois tool
+    
+    # Tracking when we first/last saw this entity
+    first_seen = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
+    last_seen = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
 
     # Timestamps for tracking
     created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
@@ -177,6 +192,8 @@ class EntityInput(BaseModel):
         default_factory=list,
         description="List of aliases that map to this canonical name",
     )
+    entity_type: str | None = Field(None, description="Entity type (person, place, etc.)")
+    description: str | None = Field(None, description="Brief description for whois")
 
 
 class EntityBatch(BaseModel):
