@@ -64,6 +64,52 @@ class EntityService:
         canonical_names = list(set(canonical_names))
 
         return {"entities": canonical_names, "unknown_entities": unknown_names}
+    
+    async def canonicalize_names_with_ids(self, names: list[str]) -> dict[str, Any]:
+        """
+        Canonicalize a list of names, returning canonical forms with IDs and unknowns.
+
+        Args:
+            names: List of names to canonicalize
+
+        Returns:
+            Dict with 'entities' list (containing dicts with 'id' and 'name'), 
+            'entity_ids' list, and 'unknown_entities' list
+        """
+        entities = []
+        entity_ids = []
+        unknown_names = []
+        seen_ids = set()  # Track seen IDs to avoid duplicates
+
+        async with get_db() as session:
+            for name in names:
+                # First check if it's already a canonical name
+                stmt = select(Entity.id, Entity.canonical_name).where(
+                    Entity.canonical_name == name
+                )
+                result = await session.execute(stmt)
+                row = result.fetchone()
+                
+                if not row:
+                    # Then check if it's an alias
+                    stmt = select(Entity.id, Entity.canonical_name).where(
+                        text(":name = ANY(aliases)").bindparams(name=name)
+                    )
+                    result = await session.execute(stmt)
+                    row = result.fetchone()
+                
+                if row and row.id not in seen_ids:
+                    entities.append({"id": row.id, "name": row.canonical_name})
+                    entity_ids.append(row.id)
+                    seen_ids.add(row.id)
+                elif not row:
+                    unknown_names.append(name)
+
+        return {
+            "entities": entities, 
+            "entity_ids": entity_ids,
+            "unknown_entities": unknown_names
+        }
 
     async def add_entity(self, canonical_name: str, aliases: list[str]) -> None:
         """
