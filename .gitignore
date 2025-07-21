@@ -18,3 +18,6 @@ wheels/
 
 # Local entity configuration
 canonical_names.local.json
+
+# Backup files
+backup-*.sql.gz
