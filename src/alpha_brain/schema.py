@@ -8,7 +8,7 @@ from uuid import UUID, uuid4
 
 from pgvector.sqlalchemy import Vector
 from pydantic import BaseModel, Field
-from sqlalchemy import ARRAY, Column, DateTime, Interval, String, Text, func, or_
+from sqlalchemy import ARRAY, DECIMAL, Column, DateTime, Interval, String, Text, func, or_
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.ext.hybrid import hybrid_property
@@ -223,3 +223,22 @@ class IdentityFact(Base):
     period_end = Column(DateTime, nullable=True)  # End of period if applicable
     
     created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))  # When recorded
+
+
+class PersonalityDirective(Base):
+    """Behavioral directives that shape how Alpha responds."""
+    
+    __tablename__ = "personality_directives"
+    
+    id = Column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    directive = Column(Text, nullable=False, unique=True)  # The actual behavioral instruction
+    weight = Column(DECIMAL(precision=3, scale=2), nullable=False, default=1.0)  # 0.00 to 9.99
+    category = Column(String)  # Optional grouping like "intellectual_engagement"
+    
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
+    updated_at = Column(
+        DateTime,
+        nullable=False,
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+    )

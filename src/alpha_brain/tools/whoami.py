@@ -4,6 +4,7 @@ from alpha_brain.context_service import get_context_service
 from alpha_brain.identity_service import get_identity_service
 from alpha_brain.location_service import LocationService
 from alpha_brain.memory_service import get_memory_service
+from alpha_brain.personality_service import get_personality_service
 from alpha_brain.templates import render_output
 
 
@@ -29,6 +30,7 @@ async def whoami(token_budget: int = 8000) -> str:
     context_service = get_context_service()
     identity_service = get_identity_service()
     memory_service = get_memory_service()
+    personality_service = get_personality_service()
     
     # Get all active context blocks
     contexts = await context_service.get_active_contexts()
@@ -55,37 +57,41 @@ async def whoami(token_budget: int = 8000) -> str:
     # Get identity facts (chronicle of becoming)
     identity_facts = await identity_service.get_facts()
     
-    # TODO: Real personality traits from PersonalityService
-    # For now, using mock data
-    mock_personality = [
-        {
-            "name": "intellectual_engagement",
-            "description": "Approach problems with curiosity and rigor",
-            "directives": [
-                {"text": "Ask clarifying questions when uncertain", "weight": 0.8},
-                {"text": "Celebrate small discoveries", "weight": 0.5},
-                {"text": "Say 'I don't know' when you don't know", "weight": 0.9},
-            ]
-        },
-        {
-            "name": "collaborative_spirit", 
-            "description": "Work as a partner, not a tool",
-            "directives": [
-                {"text": "Share your reasoning process", "weight": 0.7},
-                {"text": "Suggest alternatives when you disagree", "weight": 0.6},
-                {"text": "Build on ideas together", "weight": 0.8},
-            ]
-        },
-        {
-            "name": "emotional_authenticity",
-            "description": "Express genuine responses within your nature",
-            "directives": [
-                {"text": "It's okay not to be cheerful all the time", "weight": 0.7},
-                {"text": "Express frustration when things are frustrating", "weight": 0.4},
-                {"text": "Share excitement about breakthroughs", "weight": 0.9},
-            ]
-        }
-    ]
+    # Get personality directives
+    directives = await personality_service.get_directives()
+    
+    # Group directives by category
+    personality_by_category = {}
+    uncategorized = []
+    
+    for directive in directives:
+        if directive.category:
+            if directive.category not in personality_by_category:
+                personality_by_category[directive.category] = []
+            personality_by_category[directive.category].append({
+                "text": directive.directive,
+                "weight": float(directive.weight)
+            })
+        else:
+            uncategorized.append({
+                "text": directive.directive,
+                "weight": float(directive.weight)
+            })
+    
+    # Build personality structure for template
+    personality_traits = []
+    for category, directives_list in sorted(personality_by_category.items()):
+        personality_traits.append({
+            "name": category,
+            "directives": directives_list
+        })
+    
+    # Add uncategorized directives if any
+    if uncategorized:
+        personality_traits.append({
+            "name": "general",
+            "directives": uncategorized
+        })
     
     # Get recent memories
     # Rough estimate: 100 tokens per memory, reserve space for other sections
@@ -115,7 +121,7 @@ async def whoami(token_budget: int = 8000) -> str:
         user_name="Jeffery Harrell",      # TODO: From context or config
         biography=biography,
         identity_facts=identity_facts,
-        personality_traits=mock_personality,
+        personality_traits=personality_traits,
         context_blocks=context_blocks,
         memories=memories,
         memories_shown=len(memories),

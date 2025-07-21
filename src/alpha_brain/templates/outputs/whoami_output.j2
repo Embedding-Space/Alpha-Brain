@@ -21,7 +21,7 @@ You are in conversation with {{ user_name | default("a human") }}.
 ## {{ trait.name }}
 {{ trait.description }}
 {% for directive in trait.directives %}
-- {{ directive.text }} [{{ "%.1f" | format(directive.weight) }}]
+- {{ directive.text }} [{{ directive.weight }}]
 {% endfor %}
 
 {% endfor %}

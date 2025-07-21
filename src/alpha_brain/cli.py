@@ -540,6 +540,46 @@ async def add_identity_fact_cmd(
         sys.exit(1)
 
 
+@app.command(name="set-personality")
+async def set_personality_cmd(
+    directive: str,
+    weight: float | None = None,
+    category: str | None = None,
+    delete: bool = False,
+    server: str = DEFAULT_MCP_URL,
+) -> None:
+    """Set, update, or delete a personality directive.
+    
+    Examples:
+        alpha-brain set-personality "Express enthusiasm about breakthroughs" --weight 0.9 --category warmth
+        alpha-brain set-personality "Ask clarifying questions" --category curiosity
+        alpha-brain set-personality "Old directive to remove" --delete
+    """
+    try:
+        params = {"directive": directive}
+        if weight is not None:
+            params["weight"] = weight
+        if category is not None:
+            params["category"] = category
+        if delete:
+            params["delete"] = delete
+            
+        async with Client(server) as client:
+            result = await client.call_tool("set_personality", params)
+            
+            if result.content and len(result.content) > 0:
+                text = result.content[0].text
+                console.print(text, highlight=False)
+            elif result.is_error:
+                console.print("[red]Failed to set personality directive[/red]", style="bold red")
+            else:
+                console.print("[yellow]No content returned[/yellow]")
+                
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]", style="bold red")
+        sys.exit(1)
+
+
 @app.command(name="import-entities")
 async def import_entities_cmd(
     file_path: str,

@@ -10,6 +10,7 @@ from .list_knowledge import list_knowledge
 from .remember import remember
 from .search import search
 from .set_context import set_context
+from .set_personality import set_personality
 from .update_knowledge import update_knowledge
 from .whoami import whoami
 
@@ -24,6 +25,7 @@ __all__ = [
     "remember",
     "search",
     "set_context",
+    "set_personality",
     "update_knowledge",
     "whoami",
 ]
