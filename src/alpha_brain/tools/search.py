@@ -148,15 +148,40 @@ async def search(ctx: Context, query: str, limit: int = 10) -> str:
     if emotional_memories and all(m.similarity_score < 0.3 for m in emotional_memories):
         emotional_warning = "Emotional search returned low-quality results."
     
+    # Deduplicate memories across sections
+    # Priority: entity > knowledge > full-text > semantic > emotional
+    seen_ids = set()
+    
+    # Full-text memories get first pass (after entity/knowledge)
+    deduped_fulltext = []
+    for memory in fulltext_memories:
+        if memory.id not in seen_ids:
+            seen_ids.add(memory.id)
+            deduped_fulltext.append(memory)
+    
+    # Semantic memories exclude anything already shown
+    deduped_semantic = []
+    for memory in semantic_memories:
+        if memory.id not in seen_ids:
+            seen_ids.add(memory.id)
+            deduped_semantic.append(memory)
+    
+    # Emotional memories exclude anything already shown
+    deduped_emotional = []
+    for memory in emotional_memories:
+        if memory.id not in seen_ids:
+            seen_ids.add(memory.id)
+            deduped_emotional.append(memory)
+    
     # Format the adaptive results
     return render_output(
         "search",
         query=query,
         entity=entity_match,
         knowledge=knowledge_match,
-        fulltext_memories=fulltext_memories,
-        semantic_memories=semantic_memories,
-        emotional_memories=emotional_memories,
+        fulltext_memories=deduped_fulltext,
+        semantic_memories=deduped_semantic,
+        emotional_memories=deduped_emotional,
         semantic_warning=semantic_warning,
         emotional_warning=emotional_warning,
         search_mode=search_mode,
