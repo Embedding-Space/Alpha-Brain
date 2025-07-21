@@ -50,8 +50,7 @@ class PersonalityService:
                     await db.commit()
                     logger.info("Deleted personality directive", directive=directive)
                     return {"status": "deleted", "directive": directive}
-                else:
-                    return {"status": "not_found", "directive": directive}
+                return {"status": "not_found", "directive": directive}
             
             if existing:
                 # Update existing directive
@@ -76,31 +75,30 @@ class PersonalityService:
                     "weight": float(existing.weight),
                     "category": existing.category
                 }
-            else:
-                # Create new directive
-                new_directive = PersonalityDirective(
-                    directive=directive,
-                    weight=Decimal(str(weight)) if weight is not None else Decimal("1.0"),
-                    category=category if category else None
-                )
-                
-                db.add(new_directive)
-                await db.commit()
-                await db.refresh(new_directive)
-                
-                logger.info(
-                    "Created personality directive",
-                    directive=directive,
-                    weight=float(new_directive.weight),
-                    category=new_directive.category
-                )
-                
-                return {
-                    "status": "created",
-                    "directive": directive,
-                    "weight": float(new_directive.weight),
-                    "category": new_directive.category
-                }
+            # Create new directive
+            new_directive = PersonalityDirective(
+                directive=directive,
+                weight=Decimal(str(weight)) if weight is not None else Decimal("1.0"),
+                category=category if category else None
+            )
+
+            db.add(new_directive)
+            await db.commit()
+            await db.refresh(new_directive)
+
+            logger.info(
+                "Created personality directive",
+                directive=directive,
+                weight=float(new_directive.weight),
+                category=new_directive.category
+            )
+
+            return {
+                "status": "created",
+                "directive": directive,
+                "weight": float(new_directive.weight),
+                "category": new_directive.category
+            }
     
     async def get_directives(self, category: str | None = None) -> list[PersonalityDirective]:
         """

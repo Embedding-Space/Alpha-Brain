@@ -46,16 +46,15 @@ def format_identity_fact_time(fact) -> str:
     
     if precision == 'datetime':
         return TimeService.format_readable(fact.occurred_at)
-    elif precision == 'day':
+    if precision == 'day':
         # Format as just the date
         return TimeService.parse(fact.occurred_at).format("MMMM D, YYYY")
-    elif precision == 'month':
+    if precision == 'month':
         return TimeService.parse(fact.occurred_at).format("MMMM YYYY")
-    elif precision == 'year':
+    if precision == 'year':
         return TimeService.parse(fact.occurred_at).format("YYYY")
-    else:
-        # For periods and eras, use display or fallback
-        return getattr(fact, 'temporal_display', TimeService.format_readable(fact.occurred_at))
+    # For periods and eras, use display or fallback
+    return getattr(fact, 'temporal_display', TimeService.format_readable(fact.occurred_at))
 
 
 # Add identity fact formatting filter

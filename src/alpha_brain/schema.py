@@ -8,7 +8,17 @@ from uuid import UUID, uuid4
 
 from pgvector.sqlalchemy import Vector
 from pydantic import BaseModel, Field
-from sqlalchemy import ARRAY, DECIMAL, Column, DateTime, Interval, String, Text, func, or_
+from sqlalchemy import (
+    ARRAY,
+    DECIMAL,
+    Column,
+    DateTime,
+    Interval,
+    String,
+    Text,
+    func,
+    or_,
+)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.ext.hybrid import hybrid_property

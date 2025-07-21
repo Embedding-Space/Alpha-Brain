@@ -44,13 +44,13 @@ async def set_personality(
     
     if result["status"] == "deleted":
         return f"Deleted directive: \"{directive}\""
-    elif result["status"] == "not_found":
+    if result["status"] == "not_found":
         return f"Directive not found: \"{directive}\""
-    elif result["status"] == "created":
+    if result["status"] == "created":
         weight_str = f" (weight: {result['weight']})" if result['weight'] != 1.0 else ""
         category_str = f" in category '{result['category']}'" if result['category'] else ""
         return f"Created directive: \"{directive}\"{weight_str}{category_str}"
-    else:  # updated
-        weight_str = f" (weight: {result['weight']})" if result['weight'] != 1.0 else ""
-        category_str = f" in category '{result['category']}'" if result['category'] else ""
-        return f"Updated directive: \"{directive}\"{weight_str}{category_str}"
+    # updated
+    weight_str = f" (weight: {result['weight']})" if result['weight'] != 1.0 else ""
+    category_str = f" in category '{result['category']}'" if result['category'] else ""
+    return f"Updated directive: \"{directive}\"{weight_str}{category_str}"

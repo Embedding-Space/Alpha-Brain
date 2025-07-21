@@ -1,6 +1,6 @@
 """Add an identity fact to the chronicle of becoming."""
 
-from datetime import UTC, datetime
+from datetime import UTC
 
 import dateparser
 

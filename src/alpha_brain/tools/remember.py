@@ -5,7 +5,20 @@ from alpha_brain.templates import render_output
 
 
 async def remember(content: str) -> str:
-    """Remember a piece of information as prose."""
+    """
+    Store a memory with semantic and emotional context.
+    
+    While embeddings are automatically truncated to ~15-20 sentences for indexing,
+    the full text is always preserved. Consider putting the core insight or 
+    emotional significance early in the memory, but don't overthink it - the most 
+    important thing is to capture what matters.
+    
+    Args:
+        content: The memory to store, written naturally as prose
+        
+    Returns:
+        Confirmation with memory preview, related memories, and analysis
+    """
     import structlog
 
     logger = structlog.get_logger()
