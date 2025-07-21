@@ -32,6 +32,17 @@ The system maintains canonical entity names with aliases for consistent resoluti
 - **Marginalia** field stores Helper's analysis including entities, keywords, and summaries
 - Example: "Jeff" → "Jeffery Harrell", "Sparkle" → "Sparkplug Louise Mittenhaver"
 
+### Identity & Context Management (NEW)
+
+Alpha Brain now includes comprehensive identity management:
+
+- **Context Service**: Manages biography, continuity messages, and context blocks with TTL
+- **Identity Service**: Chronicle of becoming - timestamped facts with temporal precision
+- **Personality Service**: Mutable behavioral directives with weights and categories
+- **Location Service**: Geo-IP based location for spatial grounding
+- **Time Service**: Human-readable datetime formatting with day names
+- **`whoami` Tool**: Provides complete context loading replacing Alpha-Recall's `gentle_refresh`
+
 ## Essential Commands
 
 **Important**: This project uses `uv` for package management. Always use `uv run python` instead of `python` or `python3`.
@@ -112,7 +123,7 @@ just clean-cache # Clean Python cache files
 - **Postgres + pgvector**: Vector similarity search with cosine distance
 - **Sentence-transformers**: 
   - Semantic: all-mpnet-base-v2 (768D) - better quality than MiniLM
-  - Emotional: ng3owb/sentiment-embedding-model (7D categorical)
+  - Emotional: j-hartmann/emotion-english-roberta-large (7D categorical - non-orthogonal basis)
 - **PydanticAI + Ollama**: Local entity extraction with configurable model (defaults to gemma3:4b)
 - **Pydantic Settings**: Environment validation (DATABASE_URL required)
 - **One-time service initialization**: Database and embedding services persist across MCP connections
@@ -139,16 +150,19 @@ just clean-cache # Clean Python cache files
 - **Browse mode**: Search without query to see all memories in a time period
 - **Entity filtering**: Filter search results by canonical entity names
 - **FastMCP logging**: Server-side logging with Context parameter for debugging
+- **Identity management**: `whoami` tool with full context loading
+- **Context blocks**: Biography, continuity messages, and custom blocks with TTL
+- **Identity facts**: Chronicle of becoming with temporal precision (era/year/month/day/datetime)
+- **Personality directives**: Mutable behavioral instructions with weights and categories
 
 ### What's Next (TODOs)
 - Build unified search across memories and knowledge
 - Add "crystallize" function to extract knowledge from memories
-- ~~Add temporal search (memories from time period)~~ ✅ Implemented!
 - Entity merge functionality (combine misspelled/duplicate entities)
 - Import canonical entities from JSON file via MCP tool
 - Add pagination support (offset parameter) for large result sets
-- Update search output template for temporal results
 - Create OOBE (out-of-box experience) tests for fresh install
+- Implement user_name configuration (currently hard-coded as "Jeffery Harrell")
 
 ## Common Patterns
 
