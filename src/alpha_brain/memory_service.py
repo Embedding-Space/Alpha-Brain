@@ -13,7 +13,7 @@ from structlog import get_logger
 from alpha_brain.database import get_db
 from alpha_brain.embeddings import get_embedding_service
 from alpha_brain.entity_service import get_entity_service
-from alpha_brain.helper import MemoryHelper
+from alpha_brain.memory_helper import MemoryHelper
 from alpha_brain.interval_parser import parse_interval
 from alpha_brain.schema import Memory, MemoryOutput
 from alpha_brain.splash_engine import get_splash_engine
@@ -36,11 +36,18 @@ class MemoryService:
         try:
             logger.info("Analyzing memory")
             metadata = await self.memory_helper.analyze_memory(content)
+            
+            # Get entity IDs for the canonical entities
+            entity_service = get_entity_service()
+            entity_result = await entity_service.canonicalize_names_with_ids(
+                metadata.entities + metadata.unknown_entities
+            )
 
             # Convert to dict for storage
             metadata_dict = {
                 "entities": metadata.entities,
                 "unknown_entities": metadata.unknown_entities,
+                "entity_ids": entity_result["entity_ids"],  # Add entity IDs
                 "importance": metadata.importance,
                 "keywords": metadata.keywords,
                 "summary": metadata.summary,
@@ -51,6 +58,7 @@ class MemoryService:
                 "Memory analyzed",
                 entity_count=len(metadata.entities),
                 unknown_count=len(metadata.unknown_entities),
+                entity_ids=entity_result["entity_ids"],
                 importance=metadata.importance,
             )
             return metadata_dict
@@ -61,6 +69,7 @@ class MemoryService:
                 "summary": content[:100] + "..." if len(content) > 100 else content,
                 "importance": 3,
                 "analyzed_at": pendulum.now("UTC").isoformat(),
+                "entity_ids": [],  # Empty entity IDs on failure
             }
 
     async def remember(
@@ -95,6 +104,7 @@ class MemoryService:
                     semantic_embedding=semantic_emb.tolist(),
                     emotional_embedding=emotional_emb.tolist(),
                     marginalia=combined_marginalia,
+                    entity_ids=metadata.get("entity_ids", []),  # Store entity IDs
                 )
 
                 session.add(memory)
