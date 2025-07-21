@@ -1,14 +1,92 @@
-Current time: {{ current_time | format_time_full }}
+{{ current_time }}
 
-{% for memory in memories %}
+Query emotion: {{ dominant_emotion }} ({{ "%.3f"|format(dominant_score) }}) | Neutral similarity: {{ "%.3f"|format(neutral_similarity) }}
+Search mode: {{ search_mode }}
+
+{% if entity %}
+## Entity
+
+**{{ entity.canonical_name }}** {% if entity.entity_type %}({{ entity.entity_type }}){% endif %}
+{% if entity.description %}{{ entity.description }}{% endif %}
+{% if entity.aliases %}Also known as: {{ entity.aliases | join(', ') }}{% endif %}
+
+{% endif %}
+{% if knowledge %}
+
+## Knowledge
+
+**{{ knowledge.title }}**
+{{ knowledge.summary }}
+
+{% endif %}
+{% if fulltext_memories %}
+
+## Full-Text Matches
+
+{% for memory in fulltext_memories %}
 ---
-{{ loop.index }}. {{ memory.age }}{% if memory.similarity_score is not none %} (similarity: {{ "%.2f" | format(memory.similarity_score) }}){% endif %}:
+{{ loop.index }}. {{ memory.age }}:
 
 {{ memory.content }}
 
 ID: {{ memory.id }}
-{%- if memory.semantic_similarity is defined and memory.emotional_similarity is defined %}
-Semantic similarity: {{ "%.2f" | format(memory.semantic_similarity) }}, Emotional similarity: {{ "%.2f" | format(memory.emotional_similarity) }}
-{%- endif %}
-
 {% endfor %}
+{% endif %}
+{% if search_mode == "semantic" %}
+{% if semantic_memories %}
+
+## Memories
+{% if semantic_warning %}
+
+**WARNING**: {{ semantic_warning }}
+{% endif %}
+
+{% for memory in semantic_memories %}
+---
+{{ loop.index }}. {{ memory.age }} (similarity: {{ "%.2f"|format(memory.similarity_score) }}):
+
+{{ memory.content }}
+
+ID: {{ memory.id }}
+{% endfor %}
+{% elif not entity and not knowledge and not fulltext_memories %}
+No results found for "{{ query }}"
+{% endif %}
+{% else %}
+{% if semantic_memories %}
+
+## Semantically Related Memories
+{% if semantic_warning %}
+
+**WARNING**: {{ semantic_warning }}
+{% endif %}
+
+{% for memory in semantic_memories %}
+---
+{{ loop.index }}. {{ memory.age }} (similarity: {{ "%.2f"|format(memory.similarity_score) }}):
+
+{{ memory.content }}
+
+ID: {{ memory.id }}
+{% endfor %}
+{% endif %}
+{% if emotional_memories %}
+
+## Emotionally Resonant Memories
+{% if emotional_warning %}
+
+**WARNING**: {{ emotional_warning }}
+{% endif %}
+
+{% for memory in emotional_memories %}
+---
+{{ loop.index }}. {{ memory.age }} (similarity: {{ "%.2f"|format(memory.similarity_score) }}):
+
+{{ memory.content }}
+
+ID: {{ memory.id }}
+{% endfor %}
+{% elif not semantic_memories and not entity and not knowledge and not fulltext_memories %}
+No results found for "{{ query }}"
+{% endif %}
+{% endif %}

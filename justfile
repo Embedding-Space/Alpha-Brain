@@ -23,6 +23,10 @@ down:
     docker compose --profile test down
     docker compose down
 
+# Restart all services
+bounce: down up
+    @echo "🔄 All services restarted!"
+
 # Restart MCP server (picks up code changes instantly)
 restart:
     docker compose restart alpha-brain-mcp
@@ -50,7 +54,7 @@ test-down:
     @docker compose --profile test down
 
 # Run all E2E tests (assumes populated test database)
-test: test-up
+test:
     @echo "🧪 Running E2E tests..."
     @env MCP_TEST_URL="http://localhost:9101/mcp/" uv run pytest tests/e2e/ -v -s
 

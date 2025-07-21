@@ -70,68 +70,33 @@ async def remember(
 
 @app.command
 async def search(
-    query: str = "",
-    mode: str = "semantic",
-    interval: str = "",
-    entity: str = "",
+    query: str,
     limit: int = 10,
-    offset: int = 0,
-    order: str = "auto",
     server: str = DEFAULT_MCP_URL,
     raw: bool = False,
 ) -> None:
-    """Search memories and knowledge in Alpha Brain with temporal and entity filters.
-
+    """Search everything: entities, knowledge, and memories.
+    
+    Automatically analyzes your query emotion and chooses the best search strategy:
+    - Neutral queries: Full-text + Semantic search
+    - Emotional queries: Full-text + Semantic + Emotional search
+    
     Args:
-        query: Search query (empty for browsing mode)
-        mode: Type of search (semantic, emotional, both, exact)
-        interval: Time interval (e.g., "yesterday", "past 2 hours", "2025-07-01/2025-07-31")
-        entity: Filter by entity name
-        limit: Maximum results to return
-        offset: Number of results to skip (for pagination)
-        order: Sort order (asc, desc, auto)
+        query: The search query
+        limit: Maximum number of results per search type
         server: MCP server URL
         raw: Show raw output without formatting
     """
     try:
-        # Build parameters dict, only including non-empty values
-        params = {}
-        if query:
-            params["query"] = query
-        if mode != "semantic":
-            params["mode"] = mode
-        if interval:
-            params["interval"] = interval
-        if entity:
-            params["entity"] = entity
-        if limit != 10:
-            params["limit"] = limit
-        if offset != 0:
-            params["offset"] = offset
-        if order != "auto":
-            params["order"] = order
-
-        # Set up log handler to display FastMCP server logs
-        async def log_handler(message):
-            level = message.level.upper()
-            logger_name = message.logger or 'server'
-            data = message.data
-            
-            # Color-code log levels
-            if level == "DEBUG":
-                console.print(f"[dim]🔍 {logger_name}: {data}[/dim]")
-            elif level == "INFO":
-                console.print(f"ℹ️  {logger_name}: {data}")  # noqa: RUF001
-            elif level == "WARNING":
-                console.print(f"[yellow]⚠️  {logger_name}: {data}[/yellow]")
-            elif level == "ERROR":
-                console.print(f"[red]❌ {logger_name}: {data}[/red]")
-            else:
-                console.print(f"📝 {logger_name}: {data}")
-
-        async with Client(server, log_handler=log_handler) as client:
+        # Build parameters
+        params = {
+            "query": query,
+            "limit": limit
+        }
+        
+        async with Client(server) as client:
             result = await client.call_tool("search", params)
-
+            
             if raw:
                 # Show the raw CallToolResult structure
                 console.print(f"CallToolResult: {result}")
@@ -144,13 +109,14 @@ async def search(
                 text = result.content[0].text
                 console.print(text, highlight=False)
             elif result.is_error:
-                console.print("[red]Error searching memories[/red]", style="bold red")
+                console.print("[red]Error searching[/red]", style="bold red")
             else:
                 console.print("[yellow]No results found[/yellow]")
-
+                
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]", style="bold red")
         sys.exit(1)
+
 
 
 @app.command
