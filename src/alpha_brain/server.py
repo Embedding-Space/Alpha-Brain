@@ -8,9 +8,7 @@ from structlog import get_logger
 from alpha_brain.tools import (
     add_alias,
     add_identity_fact,
-    analyze_cluster,
     create_knowledge,
-    crystallize,
     find_clusters,
     get_cluster,
     get_knowledge,
@@ -115,8 +113,6 @@ mcp = FastMCP(
 mcp.tool(health_check)
 mcp.tool(remember)
 mcp.tool(search)
-mcp.tool(crystallize)
-mcp.tool(analyze_cluster)
 mcp.tool(find_clusters)
 mcp.tool(get_cluster)
 mcp.tool(get_memory)
