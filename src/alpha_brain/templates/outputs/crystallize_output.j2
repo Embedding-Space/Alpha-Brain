@@ -6,7 +6,8 @@ Analysis mode: {{ mode }}
 {% endif %}
 Memories analyzed: {{ filtered_count }}{% if total_count %} (of {{ total_count }} total){% endif %}
 
-Found {{ cluster_count }} cluster{{ cluster_count | pluralize }} of related memories.
+Found {{ total_clusters_found }} cluster{{ total_clusters_found | pluralize }} of related memories.
+{% if filtered_clusters > 0 %}(Filtered out {{ filtered_clusters }} cluster{{ filtered_clusters | pluralize }} with < {{ min_cluster_size }} memories){% endif %}
 
 {% if candidates %}
 ## Memory Clusters
@@ -15,8 +16,9 @@ Found {{ cluster_count }} cluster{{ cluster_count | pluralize }} of related memo
 ---
 ### Cluster {{ loop.index }}
 **{{ candidate.memory_count }} memories** • Similarity: {{ "%.3f"|format(candidate.similarity) }}  
-**Metrics**: Radius {{ "%.4f"|format(candidate.radius) if candidate.radius else "N/A" }} • Interestingness {{ "%.3f"|format(candidate.interestingness_score) if candidate.interestingness_score else "N/A" }}  
-Time span: {{ candidate.oldest }} to {{ candidate.newest }}
+**Score**: {{ "%.3f"|format(candidate.interestingness_score) if candidate.interestingness_score else "N/A" }}  
+{% if candidate.interestingness_vector %}**Components**: Size={{ "%.2f"|format(candidate.interestingness_vector[0]) }} • Tightness={{ "%.2f"|format(candidate.interestingness_vector[1]) }} • Focus={{ "%.2f"|format(candidate.interestingness_vector[2]) }} • Density={{ "%.2f"|format(candidate.interestingness_vector[3]) }}{% endif %}  
+Time span: {{ candidate.oldest }} to {{ candidate.newest }} ({{ "%.1f"|format(candidate.time_span_days) if candidate.time_span_days else "0" }} days)
 
 {% if candidate.centroid %}**Most representative memory ({{ candidate.centroid.timestamp }}):**
 {{ candidate.centroid.content }}

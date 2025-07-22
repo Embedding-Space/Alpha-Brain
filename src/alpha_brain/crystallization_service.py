@@ -29,19 +29,20 @@ class ClusterCandidate:
         self.memory_count = len(memories)
         self.memory_ids = [str(m.id) for m in memories]
         
+        # Calculate age range for the cluster first (needed for metrics)
+        created_dates = [m.created_at for m in memories]
+        self.oldest = min(created_dates)
+        self.newest = max(created_dates)
+        
         # Calculate cluster metrics if embeddings provided
         self.centroid = None
         self.radius = None
         self.density_std = None
         self.interestingness_score = 0.0
+        self.interestingness_vector = np.zeros(4)  # [size, tightness, focus, density]
         
         if embeddings is not None and len(embeddings) > 0:
             self._calculate_metrics(embeddings)
-        
-        # Calculate age range for the cluster
-        created_dates = [m.created_at for m in memories]
-        self.oldest = min(created_dates)
-        self.newest = max(created_dates)
         
         # Default values - will be updated by Helper analysis
         self.title = f"Cluster {cluster_id}"
@@ -56,6 +57,11 @@ class ClusterCandidate:
         # Centroid memory - will be set by crystallization service
         self.centroid_memory: Memory | None = None
         self.centroid_distance: float = 0.0
+    
+    @property
+    def time_span_days(self) -> float:
+        """Get time span in days."""
+        return (self.newest - self.oldest).total_seconds() / 86400.0
     
     def _calculate_metrics(self, embeddings: np.ndarray):
         """Calculate cluster metrics: centroid, radius, density."""
@@ -84,19 +90,54 @@ class ClusterCandidate:
         # Density standard deviation
         self.density_std = float(np.std(distances))
         
-        # Calculate interestingness score
-        # More memories + smaller radius = more interesting
-        # Using harmonic mean to balance size and tightness
-        if self.radius > 0:
-            # Size factor: log scale to avoid huge clusters dominating
-            size_factor = np.log10(self.memory_count + 1)  # +1 to avoid log(0)
-            # Tightness factor: inverse of radius
-            tightness_factor = 1.0 / self.radius
-            # Combine with harmonic mean
-            self.interestingness_score = 2 * (size_factor * tightness_factor) / (size_factor + tightness_factor)
+        # Calculate time span in days
+        time_span_seconds = (self.newest - self.oldest).total_seconds()
+        time_span_days = time_span_seconds / 86400.0  # Convert to days
+        
+        # Calculate interestingness vector components
+        # 1. Size score: Aggressive penalty for small clusters
+        optimal_size = 25.0
+        if self.memory_count < 5:
+            # Severe penalty for tiny clusters - exponential decay
+            size_score = 0.5 * (self.memory_count / 5.0) ** 2
+        elif self.memory_count < 15:
+            # Linear ramp up to midpoint
+            size_score = 0.5 + 4.5 * (self.memory_count - 5) / 10.0
+        elif self.memory_count <= 35:
+            # Peak region around 25
+            # Gaussian-like peak
+            deviation = abs(self.memory_count - optimal_size) / 5.0
+            size_score = 10.0 * np.exp(-0.5 * deviation ** 2)
         else:
-            # Perfect cluster (all identical)
-            self.interestingness_score = float('inf')
+            # Gentle decline for large clusters
+            size_score = 5.0 * np.exp(-((self.memory_count - 35) / 50.0))
+        
+        # 2. Tightness score: inverse of radius, but scaled to reasonable range
+        # Map radius [0, 1] to score [10, 1]
+        tightness_score = max(1.0, min(10.0, 1.0 / (self.radius + 0.1)))
+        
+        # 3. Temporal focus score: inverse log of time span
+        # Map days [0, 365] to score [10, 1] roughly
+        if time_span_days < 0.04:  # Less than 1 hour
+            focus_score = 10.0
+        else:
+            focus_score = max(1.0, min(10.0, 2.0 / np.log10(time_span_days + 1.1)))
+        
+        # 4. Density uniformity score: inverse of std dev
+        density_score = max(1.0, min(10.0, 1.0 / (self.density_std + 0.1)))
+        
+        # Store as vector
+        self.interestingness_vector = np.array([
+            size_score,
+            tightness_score,
+            focus_score,
+            density_score
+        ])
+        
+        # Calculate scalar score as weighted dot product
+        # Heavily weight size to avoid tiny clusters dominating
+        weights = np.array([0.5, 0.25, 0.15, 0.1])
+        self.interestingness_score = float(np.dot(self.interestingness_vector, weights))
 
 
 class CrystallizationService:
@@ -105,6 +146,9 @@ class CrystallizationService:
     def __init__(self, algorithm: ClusterAlgorithm = "hdbscan"):
         self.algorithm = algorithm
         self.helper = None  # Lazy initialization
+        self._cached_clusters: list[ClusterCandidate] | None = None
+        self._cache_params: dict[str, Any] | None = None
+        self._cache_memory_ids: set[str] | None = None
         
     def cluster_memories(
         self, 
@@ -126,6 +170,14 @@ class CrystallizationService:
         """
         if not memories:
             return []
+        
+        # Check if we can use cached results
+        if self._is_cache_valid(memories, similarity_threshold, embedding_type, n_clusters):
+            logger.info(
+                "Using cached clustering results",
+                cluster_count=len(self._cached_clusters) if self._cached_clusters else 0
+            )
+            return self._cached_clusters or []
             
         logger.info(
             "Starting clustering",
@@ -239,6 +291,16 @@ class CrystallizationService:
             noise_points=sum(1 for l in labels if l == -1)
         )
         
+        # Cache the results
+        self._cached_clusters = candidates
+        self._cache_params = {
+            "similarity_threshold": similarity_threshold,
+            "embedding_type": embedding_type,
+            "n_clusters": n_clusters,
+            "algorithm": self.algorithm
+        }
+        self._cache_memory_ids = {str(m.id) for m in memories}
+        
         return candidates
         
     def _cluster_hdbscan(self, embeddings: np.ndarray, threshold: float) -> np.ndarray:
@@ -349,6 +411,42 @@ class CrystallizationService:
                 analyzed_candidates.append(candidate)
                 
         return analyzed_candidates
+    
+    def _is_cache_valid(
+        self,
+        memories: list[Memory],
+        similarity_threshold: float,
+        embedding_type: Literal["semantic", "emotional"],
+        n_clusters: int | None
+    ) -> bool:
+        """Check if cached clusters are valid for the given parameters."""
+        if self._cached_clusters is None or self._cache_params is None:
+            return False
+        
+        # Check if parameters match
+        params_match = (
+            self._cache_params.get("similarity_threshold") == similarity_threshold and
+            self._cache_params.get("embedding_type") == embedding_type and
+            self._cache_params.get("n_clusters") == n_clusters and
+            self._cache_params.get("algorithm") == self.algorithm
+        )
+        
+        if not params_match:
+            return False
+        
+        # Check if the same memories are being clustered
+        current_memory_ids = {str(m.id) for m in memories}
+        return current_memory_ids == self._cache_memory_ids
+    
+    def get_cached_clusters(self) -> list[ClusterCandidate] | None:
+        """Get cached clusters if available."""
+        return self._cached_clusters
+    
+    def clear_cache(self):
+        """Clear the cluster cache."""
+        self._cached_clusters = None
+        self._cache_params = None
+        self._cache_memory_ids = None
 
 
 # Global instance

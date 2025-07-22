@@ -22,7 +22,10 @@ async def crystallize(
     limit: int = 10,
     algorithm: str = "hdbscan",
     n_clusters: int | None = None,
-    similarity_threshold: float = 0.75
+    similarity_threshold: float = 0.55,
+    sort_by: str = "interestingness",
+    min_cluster_size: int = 5,
+    refresh: bool = False
 ) -> str:
     """
     Find clusters of related memories that might contain crystallizable knowledge.
@@ -31,6 +34,9 @@ async def crystallize(
     Use this to discover potential knowledge patterns before deciding which clusters
     deserve deeper investigation.
     
+    Results are cached so that analyze_cluster can reliably examine the same clusters.
+    Run with refresh=True to force new clustering.
+    
     Args:
         ctx: MCP context
         query: Filter memories by semantic relevance to this query
@@ -38,7 +44,14 @@ async def crystallize(
         limit: Maximum number of cluster candidates to return
         algorithm: Clustering algorithm to use (hdbscan, kmeans, dbscan, agglomerative)
         n_clusters: Number of clusters for kmeans (defaults to sqrt(n_memories))
-        similarity_threshold: Minimum similarity for clustering (0.75 default, higher = tighter clusters)
+        similarity_threshold: Minimum similarity for clustering (0.55 default, range 0.4-0.8)
+            - 0.75-0.8: Very tight clusters (often just 2-3 highly similar memories)
+            - 0.65-0.75: Balanced clusters (recommended default)
+            - 0.5-0.65: Looser topical groupings
+            - 0.4-0.5: Very broad themes (may be too noisy)
+        sort_by: How to sort results - "interestingness" (default) or "size"
+        min_cluster_size: Minimum number of memories required in a cluster (default 5)
+        refresh: Force fresh clustering instead of using cached results (default False)
         
     Returns:
         List of memory clusters with basic statistics and preview content
@@ -135,6 +148,11 @@ async def crystallize(
     # Step 2: Run clustering analysis on filtered memory set
     crystallization_service = get_crystallization_service(algorithm=algorithm)
     
+    # Clear cache if refresh requested
+    if refresh:
+        crystallization_service.clear_cache()
+        logger.info("Cleared cluster cache - running fresh clustering")
+    
     # Calculate default n_clusters if not provided
     if algorithm == "kmeans" and n_clusters is None:
         import math
@@ -148,8 +166,17 @@ async def crystallize(
         n_clusters=n_clusters
     )
     
-    # Sort by interestingness score (most interesting first)
-    candidates.sort(key=lambda c: c.interestingness_score, reverse=True)
+    # Filter out small clusters
+    total_clusters_found = len(candidates)
+    candidates = [c for c in candidates if c.memory_count >= min_cluster_size]
+    filtered_clusters = total_clusters_found - len(candidates)
+    
+    # Sort by chosen method
+    if sort_by == "size":
+        candidates.sort(key=lambda c: c.memory_count, reverse=True)
+    else:
+        # Default to interestingness
+        candidates.sort(key=lambda c: c.interestingness_score, reverse=True)
     
     # Convert candidates to template-friendly format (no Helper analysis)
     candidate_dicts = []
@@ -194,6 +221,8 @@ async def crystallize(
             "radius": candidate.radius,
             "density_std": candidate.density_std,
             "interestingness_score": candidate.interestingness_score,
+            "interestingness_vector": candidate.interestingness_vector.tolist() if hasattr(candidate, 'interestingness_vector') else None,
+            "time_span_days": candidate.time_span_days if hasattr(candidate, 'time_span_days') else 0,
             "oldest": oldest_formatted,
             "newest": newest_formatted,
             "centroid": centroid_data,
@@ -209,6 +238,9 @@ async def crystallize(
         filtered_count=filtered_count,
         total_count=total_count,
         cluster_count=len(candidates),
+        total_clusters_found=total_clusters_found,
+        filtered_clusters=filtered_clusters,
+        min_cluster_size=min_cluster_size,
         candidates=candidate_dicts,
         current_time=TimeService.format_full(TimeService.now())
     )

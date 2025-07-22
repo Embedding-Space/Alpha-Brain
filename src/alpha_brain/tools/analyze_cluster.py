@@ -21,13 +21,15 @@ async def analyze_cluster(
     interval: str | None = None,
     algorithm: str = "hdbscan",
     n_clusters: int | None = None,
-    similarity_threshold: float = 0.75
+    similarity_threshold: float = 0.55,
+    min_cluster_size: int = 5
 ) -> str:
     """
     Show all memories in a specific cluster for detailed analysis.
     
-    This tool re-runs the clustering with the same parameters as crystallize,
-    then shows all memories from the requested cluster number.
+    This tool uses cached results from the most recent crystallize run when possible.
+    If parameters don't match or no cache exists, it re-runs the clustering.
+    For consistent results, run crystallize first with your desired parameters.
     
     Args:
         ctx: MCP context
@@ -37,6 +39,7 @@ async def analyze_cluster(
         algorithm: Clustering algorithm (must match crystallize parameters)
         n_clusters: Number of clusters for kmeans (must match crystallize parameters)
         similarity_threshold: Minimum similarity for clustering (must match crystallize parameters)
+        min_cluster_size: Minimum number of memories required in a cluster (must match crystallize parameters)
         
     Returns:
         All memories in the specified cluster with full content
@@ -121,24 +124,54 @@ async def analyze_cluster(
             result = await session.execute(stmt)
             memories = result.scalars().all()
     
-    # Step 2: Run clustering analysis with same parameters
+    # Step 2: Get crystallization service and check for cached results
     crystallization_service = get_crystallization_service(algorithm=algorithm)
     
-    # Calculate default n_clusters if not provided (for kmeans)
-    if algorithm == "kmeans" and n_clusters is None:
-        import math
-        n_clusters = max(2, int(math.sqrt(len(memories))))
+    # First check if we have cached clusters
+    cached_candidates = crystallization_service.get_cached_clusters()
+    if cached_candidates is not None:
+        # Verify the cache is for the same memories
+        cached_memory_ids = set()
+        for candidate in cached_candidates:
+            cached_memory_ids.update(candidate.memory_ids)
+        
+        current_memory_ids = {str(m.id) for m in memories}
+        
+        if cached_memory_ids == current_memory_ids:
+            logger.info("Using cached clustering results")
+            candidates = cached_candidates
+        else:
+            logger.info("Cache invalid - memory sets don't match")
+            # Run fresh clustering
+            if algorithm == "kmeans" and n_clusters is None:
+                import math
+                n_clusters = max(2, int(math.sqrt(len(memories))))
+            
+            candidates = crystallization_service.cluster_memories(
+                memories=memories,
+                similarity_threshold=similarity_threshold,
+                embedding_type="semantic",
+                n_clusters=n_clusters
+            )
+    else:
+        # No cache, run clustering
+        if algorithm == "kmeans" and n_clusters is None:
+            import math
+            n_clusters = max(2, int(math.sqrt(len(memories))))
+        
+        candidates = crystallization_service.cluster_memories(
+            memories=memories,
+            similarity_threshold=similarity_threshold,
+            embedding_type="semantic",
+            n_clusters=n_clusters
+        )
     
-    candidates = crystallization_service.cluster_memories(
-        memories=memories,
-        similarity_threshold=similarity_threshold,
-        embedding_type="semantic",
-        n_clusters=n_clusters
-    )
+    # Filter out small clusters to match crystallize behavior
+    candidates = [c for c in candidates if c.memory_count >= min_cluster_size]
     
     # Step 3: Find the requested cluster (1-based index from user)
     if cluster_number < 1 or cluster_number > len(candidates):
-        return f"Invalid cluster number. Found {len(candidates)} clusters, but you requested cluster {cluster_number}."
+        return f"Invalid cluster number. Found {len(candidates)} clusters (with >= {min_cluster_size} memories), but you requested cluster {cluster_number}."
     
     # Get the cluster (convert to 0-based index)
     cluster = candidates[cluster_number - 1]
