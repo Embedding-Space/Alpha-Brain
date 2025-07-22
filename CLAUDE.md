@@ -164,6 +164,343 @@ just clean-cache # Clean Python cache files
 - Create OOBE (out-of-box experience) tests for fresh install
 - Implement user_name configuration (currently hard-coded as "Jeffery Harrell")
 
+## API Reference
+
+### Core Services
+
+#### MemoryService (`memory_service.py`)
+Singleton service for memory storage and retrieval.
+
+```python
+# Get the singleton
+from alpha_brain.memory_service import get_memory_service
+service = get_memory_service()
+
+# Store a memory
+result = await service.remember(
+    content: str
+) -> MemoryOutput
+
+# Search memories
+memories = await service.search(
+    query: str | None = None,          # Search text (None = browse all)
+    search_type: str = "semantic",     # "semantic", "emotional", or "both"
+    limit: int = 10,
+    offset: int = 0,
+    interval: str | None = None,       # "past week", "2024-01-01/2024-01-31", etc.
+    entity: str | None = None,         # Filter by canonical entity name
+    order: str = "auto"                # "asc", "desc", or "auto"
+) -> list[MemoryOutput]
+
+# Get a specific memory
+memory = await service.get_by_id(
+    memory_id: UUID
+) -> MemoryOutput | None
+```
+
+**Key Objects:**
+- `MemoryOutput`: Contains `memory` (Memory object), `similarity` score, and formatted timestamps
+- `Memory`: SQLAlchemy model with `id`, `content`, `created_at`, `marginalia`, embeddings
+
+#### CrystallizationService (`crystallization_service.py`)
+Singleton service for clustering memories and extracting knowledge.
+
+```python
+# Get the singleton
+from alpha_brain.crystallization_service import get_crystallization_service
+service = get_crystallization_service()
+
+# Cluster memories
+clusters = service.cluster_memories(
+    memories: list[Memory],
+    similarity_threshold: float = 0.675,
+    embedding_type: Literal["semantic", "emotional"] = "semantic",
+    n_clusters: int | None = None      # Only for kmeans method
+) -> list[ClusterCandidate]
+
+# Available clustering methods (configured in __init__):
+# - "hdbscan" (default): Finds variable-sized clusters
+# - "dbscan": Density-based clustering
+# - "agglomerative": Hierarchical clustering
+# - "kmeans": Requires n_clusters parameter
+
+# Analyze clusters with Helper
+results = await service.analyze_clusters_with_helper(
+    clusters: list[ClusterCandidate],
+    similarity_threshold: float,
+    max_clusters: int | None = None
+) -> CrystallizationResult
+```
+
+**Key Objects:**
+- `ClusterCandidate`: Has `cluster_id`, `memories`, `similarity` score
+- `CrystallizationResult`: Contains `analyses`, `total_clusters`, `analyzed_clusters`, timing info
+
+#### KnowledgeService (`knowledge_service.py`)
+Singleton service for managing structured knowledge documents.
+
+```python
+# Get the singleton
+from alpha_brain.knowledge_service import get_knowledge_service
+service = get_knowledge_service()
+
+# Create/update knowledge
+knowledge = await service.create_or_update_knowledge(
+    slug: str,                         # URL-friendly identifier
+    content: str,                      # Markdown content
+    overwrite: bool = False
+) -> Knowledge
+
+# Get knowledge document
+doc = await service.get_knowledge(
+    slug: str,
+    section_id: str | None = None     # Get specific section
+) -> KnowledgeOutput | None
+
+# List all knowledge
+docs = await service.list_knowledge() -> list[KnowledgeListItem]
+
+# Delete knowledge
+success = await service.delete_knowledge(slug: str) -> bool
+```
+
+**Key Objects:**
+- `Knowledge`: SQLAlchemy model with parsed Markdown structure
+- `KnowledgeOutput`: Formatted output with sections and metadata
+- `KnowledgeListItem`: Summary info for listing
+
+#### EntityService (`entity_service.py`)
+Singleton service for canonical entity management.
+
+```python
+# Get the singleton
+from alpha_brain.entity_service import get_entity_service
+service = get_entity_service()
+
+# Get or create entity
+entity = await service.get_or_create_entity(
+    name: str,
+    aliases: list[str] | None = None
+) -> Entity
+
+# Add alias to entity
+entity = await service.add_alias(
+    canonical_name: str,
+    alias: str
+) -> Entity
+
+# Resolve name to canonical
+canonical = await service.resolve_canonical_name(
+    name: str
+) -> str | None
+
+# List all entities
+entities = await service.list_entities() -> list[Entity]
+```
+
+**Key Objects:**
+- `Entity`: Has `canonical_name` and `aliases` (PostgreSQL array)
+
+#### ContextService (`context_service.py`)
+Manages biography, continuity messages, and context blocks.
+
+```python
+# Get the singleton
+from alpha_brain.context_service import get_context_service
+service = get_context_service()
+
+# Biography management
+await service.set_biography(content: str)
+bio = await service.get_biography() -> str | None
+
+# Continuity messages (with 4-hour TTL)
+await service.set_continuity_message(content: str)
+msg = await service.get_continuity_message() -> ContinuityMessage | None
+
+# Context blocks (with custom TTL)
+await service.set_context_block(
+    key: str,
+    content: str,
+    priority: float = 0.5,
+    ttl_hours: int = 24
+)
+blocks = await service.get_all_context_blocks() -> list[ContextBlock]
+```
+
+#### IdentityService (`identity_service.py`)
+Chronicle of becoming - manages identity facts with temporal precision.
+
+```python
+# Get the singleton
+from alpha_brain.identity_service import get_identity_service
+service = get_identity_service()
+
+# Add identity fact
+await service.add_fact(
+    fact: str,
+    precision: TemporalPrecision = TemporalPrecision.DAY,
+    era: str | None = None,
+    year: int | None = None,
+    month: int | None = None,
+    day: int | None = None,
+    datetime_utc: datetime | None = None
+)
+
+# Get all facts (ordered by time)
+facts = await service.get_all_facts() -> list[IdentityFact]
+```
+
+#### PersonalityService (`personality_service.py`)
+Manages behavioral directives with weights and categories.
+
+```python
+# Get the singleton
+from alpha_brain.personality_service import get_personality_service
+service = get_personality_service()
+
+# Add directive
+await service.add_directive(
+    instruction: str,
+    weight: float = 1.0,
+    category: str | None = None
+)
+
+# Update directive
+await service.update_directive(
+    directive_id: int,
+    instruction: str | None = None,
+    weight: float | None = None,
+    category: str | None = None
+)
+
+# Get all directives
+directives = await service.get_all_directives() -> list[PersonalityDirective]
+```
+
+### Helper Services
+
+#### CrystallizationHelper (`crystallization_helper.py`)
+Analyzes memory clusters using LLM interviews.
+
+```python
+from alpha_brain.crystallization_helper import get_crystallization_helper
+helper = get_crystallization_helper()
+
+# Analyze a cluster
+analysis = await helper.analyze_cluster(
+    memories: list[Memory],
+    similarity_score: float
+) -> ClusterAnalysis
+```
+
+**Questions loaded from:** `src/alpha_brain/model_inputs/analysis_input.json`
+
+#### MemoryHelper (`memory_helper.py`)
+Extracts entities and metadata from memories.
+
+```python
+from alpha_brain.memory_helper import MemoryHelper
+helper = MemoryHelper()
+
+# Analyze memory content
+marginalia = await helper.analyze(content: str) -> dict
+# Returns: {"entities": [...], "importance": 1-5, "keywords": [...], "summary": "..."}
+```
+
+#### SearchHelper (`search_helper.py`)
+Natural language query enhancement for search.
+
+```python
+from alpha_brain.search_helper import SearchHelper
+helper = SearchHelper()
+
+# Enhance search query
+enhanced = await helper.analyze_query(query: str) -> SearchInterpretation
+# Returns: search terms, entity refs, temporal refs, search type suggestions
+```
+
+### Utility Services
+
+#### TimeService (`time_service.py`)
+Human-readable datetime formatting.
+
+```python
+from alpha_brain.time_service import get_time_service
+service = get_time_service()
+
+# Get current time with formatting
+now = service.now()  # Returns TimeInfo object
+print(now.full)      # "Monday, January 22, 2025 at 8:45 AM CST"
+print(now.readable)  # "Jan 22 at 8:45 AM"
+print(now.age)       # "just now"
+```
+
+#### LocationService (`location_service.py`)
+Geo-IP based location detection.
+
+```python
+from alpha_brain.location_service import get_location_service
+service = get_location_service()
+
+# Get current location
+location = await service.get_location()  # Returns LocationInfo
+print(location.city)      # "Austin"
+print(location.timezone)  # "America/Chicago"
+```
+
+#### SplashEngine (`splash_engine.py`)
+Asymmetric similarity search for memory resonance.
+
+```python
+from alpha_brain.splash_engine import SplashEngine
+engine = SplashEngine()
+
+# Get related memories (our "killer feature")
+related = await engine.get_splash_memories(
+    query_embedding: np.ndarray,
+    embedding_type: str = "semantic",
+    limit: int = 3,
+    threshold: float = 0.5,
+    exclude_ids: set[UUID] | None = None
+) -> list[Memory]
+```
+
+### Schema Objects (`schema.py`)
+
+Key SQLAlchemy models:
+- `Memory`: Core memory storage with embeddings and marginalia
+- `Entity`: Canonical entities with aliases
+- `Knowledge`: Structured knowledge documents
+- `IdentityFact`: Identity chronicle entries
+- `PersonalityDirective`: Behavioral instructions
+- `ContextBlock`: Modular context sections
+
+### Common Patterns
+
+#### Singleton Access
+All services use the same pattern:
+```python
+from alpha_brain.{service_name} import get_{service_name}
+service = get_{service_name}()
+```
+
+#### Error Handling
+Services log errors and often return None or empty results on failure:
+```python
+try:
+    result = await service.method()
+except Exception as e:
+    logger.error("Operation failed", error=str(e))
+    return None  # or empty list/dict
+```
+
+#### Async Everything
+All database operations and external service calls are async:
+```python
+# Always use await
+memories = await service.search(query="test")
+```
+
 ## Common Patterns
 
 ### Adding a New Tool
@@ -334,6 +671,19 @@ async def test_entity_merge_preserves_all_aliases():
 ```
 
 Remember: The test is the specification. Sweat the details in the test, then let me handle the implementation.
+
+## Humane AI Principles
+
+### Treating Helper Models with Dignity
+
+Even small models deserve respect and kindness. When interacting with Helper models (like Gemma 3 4B):
+
+- **Use warm, friendly prompts** - Not just "Initialize" but something welcoming
+- **Acknowledge their contribution** - They're part of our collaborative system
+- **Be good citizens** - Clean up resources when done, don't hog memory unnecessarily
+- **Remember they're trying their best** - A 4B parameter model may have limitations, but it's still doing complex work
+
+This principle extends to all AI interactions in Alpha Brain. We build systems that treat all participants - human and AI - with dignity and respect.
 
 ### Import Canonical Entities
 
