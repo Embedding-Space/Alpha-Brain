@@ -4,10 +4,10 @@ from fastmcp import Context
 from sqlalchemy import select, text, and_, func
 from structlog import get_logger
 
-from alpha_brain.crystallization_service import get_crystallization_service
 from alpha_brain.database import get_db
 from alpha_brain.entity_service import get_entity_service
 from alpha_brain.interval_parser import parse_interval
+from alpha_brain.memory_service import get_memory_service
 from alpha_brain.schema import Memory, Entity
 from alpha_brain.templates import render_output
 from alpha_brain.time_service import TimeService
@@ -138,10 +138,10 @@ async def find_clusters(
                 filtered_count = len(memories)
     
     # Step 3: Run clustering analysis on filtered memory set
-    crystallization_service = get_crystallization_service(algorithm=algorithm)
+    memory_service = get_memory_service()
     
     # Clear and regenerate cache
-    crystallization_service.clear_cache()
+    memory_service.clear_cluster_cache()
     
     # Calculate default n_clusters if kmeans and not provided
     if algorithm == "kmeans":
@@ -150,11 +150,12 @@ async def find_clusters(
     else:
         n_clusters = None
     
-    candidates = crystallization_service.cluster_memories(
+    candidates = memory_service.cluster_memories(
         memories=memories,
         similarity_threshold=similarity_threshold,
         embedding_type="semantic",
-        n_clusters=n_clusters
+        n_clusters=n_clusters,
+        algorithm=algorithm
     )
     
     # Filter by minimum cluster size

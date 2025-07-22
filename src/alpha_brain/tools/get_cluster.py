@@ -3,7 +3,7 @@
 from fastmcp import Context
 from structlog import get_logger
 
-from alpha_brain.crystallization_service import get_crystallization_service
+from alpha_brain.memory_service import get_memory_service
 from alpha_brain.templates import render_output
 from alpha_brain.time_service import TimeService
 
@@ -27,10 +27,10 @@ async def get_cluster(
     Returns:
         All memories in the specified cluster with full content
     """
-    # Get crystallization service and check for cached results
-    crystallization_service = get_crystallization_service()
+    # Get memory service and check for cached results
+    memory_service = get_memory_service()
     
-    cached_candidates = crystallization_service.get_cached_clusters()
+    cached_candidates = memory_service.get_cached_clusters()
     if cached_candidates is None:
         return render_output(
             "get_cluster_error",
