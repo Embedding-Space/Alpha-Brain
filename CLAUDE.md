@@ -233,7 +233,10 @@ results = await service.analyze_clusters_with_helper(
 ```
 
 **Key Objects:**
-- `ClusterCandidate`: Has `cluster_id`, `memories`, `similarity` score
+- `ClusterCandidate`: Has `cluster_id`, `memories`, `similarity` score, plus:
+  - `radius`: Max distance from centroid (cluster tightness)
+  - `density_std`: Standard deviation of distances (density measure)
+  - `interestingness_score`: Combined metric (size × tightness)
 - `CrystallizationResult`: Contains `analyses`, `total_clusters`, `analyzed_clusters`, timing info
 
 #### KnowledgeService (`knowledge_service.py`)

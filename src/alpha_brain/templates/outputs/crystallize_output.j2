@@ -1,0 +1,38 @@
+Current time: {{ current_time | format_time_full }}
+
+Analysis mode: {{ mode }}
+{% if query != "recent memories" %}Query: {{ query }}
+{% endif %}{% if interval %}Interval: {{ interval }}
+{% endif %}
+Memories analyzed: {{ filtered_count }}{% if total_count %} (of {{ total_count }} total){% endif %}
+
+Found {{ cluster_count }} cluster{{ cluster_count | pluralize }} of related memories.
+
+{% if candidates %}
+## Memory Clusters
+
+{% for candidate in candidates %}
+---
+### Cluster {{ loop.index }}
+**{{ candidate.memory_count }} memories** • Similarity: {{ "%.3f"|format(candidate.similarity) }}  
+**Metrics**: Radius {{ "%.4f"|format(candidate.radius) if candidate.radius else "N/A" }} • Interestingness {{ "%.3f"|format(candidate.interestingness_score) if candidate.interestingness_score else "N/A" }}  
+Time span: {{ candidate.oldest }} to {{ candidate.newest }}
+
+{% if candidate.centroid %}**Most representative memory ({{ candidate.centroid.timestamp }}):**
+{{ candidate.centroid.content }}
+
+*Centroid distance: {{ "%.3f"|format(candidate.centroid.distance) }}*
+{% else %}**No centroid memory available for this cluster**
+{% endif %}
+
+To analyze this cluster in depth, use: `analyze_cluster(cluster_number={{ loop.index }})`
+
+{% endfor %}
+{% else %}
+{% if filtered_count == 0 %}
+No memories found{% if query != "recent memories" %} for "{{ query }}"{% endif %}{% if interval %} in {{ interval }}{% endif %}.
+{% else %}
+No clusters found from {{ filtered_count }} memories.
+Try adjusting your filters or lowering the clustering threshold.
+{% endif %}
+{% endif %}

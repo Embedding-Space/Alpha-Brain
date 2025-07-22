@@ -8,8 +8,8 @@ class Settings(BaseSettings):
     """Application settings from environment variables."""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
+        # Don't load .env files - we use Docker Compose for config
+        env_file=None,
         case_sensitive=False,
     )
 

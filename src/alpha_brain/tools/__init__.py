@@ -2,7 +2,9 @@
 
 from .add_alias import add_alias
 from .add_identity_fact import add_identity_fact
+from .analyze_cluster import analyze_cluster
 from .create_knowledge import create_knowledge
+from .crystallize import crystallize
 from .get_knowledge import get_knowledge
 from .get_memory import get_memory
 from .health_check import health_check
@@ -17,7 +19,9 @@ from .whoami import whoami
 __all__ = [
     "add_alias",
     "add_identity_fact",
+    "analyze_cluster",
     "create_knowledge",
+    "crystallize",
     "get_knowledge",
     "get_memory",
     "health_check",

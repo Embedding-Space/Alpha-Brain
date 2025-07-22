@@ -70,6 +70,11 @@ class TimeService:
     def now(cls) -> DateTime:
         """Get current time as Pendulum DateTime in local timezone."""
         return pendulum.now(cls.get_timezone())
+    
+    @classmethod
+    def get_local_timezone(cls) -> str:
+        """Get the local timezone string (alias for get_timezone for clarity)."""
+        return cls.get_timezone()
 
     @classmethod
     def parse(cls, dt: str | datetime | DateTime | None) -> DateTime:
@@ -221,5 +226,22 @@ class TimeService:
         """
         parsed = cls.parse(dt)
         date_time_part = parsed.format("dddd, MMMM D, YYYY [at] h:mm A")
+        tz_abbr = parsed.format("zz")
+        return f"{date_time_part} {tz_abbr}"
+
+    @classmethod
+    def format_datetime_scannable(cls, dt: str | datetime | DateTime) -> str:
+        """Format datetime in scannable format for crystallization.
+
+        Format: "7/20/2025 5:06 AM PDT"
+
+        Args:
+            dt: The datetime to format
+
+        Returns:
+            Scannable datetime string
+        """
+        parsed = cls.parse(dt)
+        date_time_part = parsed.format("M/D/YYYY h:mm A")
         tz_abbr = parsed.format("zz")
         return f"{date_time_part} {tz_abbr}"

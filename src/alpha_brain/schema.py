@@ -57,8 +57,8 @@ class Memory(Base):
     # For future TTL support if we want ephemeral memories
     expires_at = Column(DateTime, nullable=True)
     
-    # Full-text search vector (automatically maintained by trigger)
-    search_vector = Column(Text)  # Actually tsvector, but SQLAlchemy treats as text
+    # Note: search_vector column exists in the database but is excluded from ORM
+    # It's automatically maintained by PostgreSQL trigger and only used in raw SQL queries
 
 
 class MemoryInput(BaseModel):
