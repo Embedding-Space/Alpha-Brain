@@ -1,21 +1,8 @@
 {{ current_time }}
 
-# Cluster {{ cluster_id }} Details
-
-**Size**: {{ memory_count }} {{ 'memory' if memory_count == 1 else 'memories' }}
-**Similarity**: {{ "%.3f"|format(similarity) }} | **Interestingness**: {{ "%.2f"|format(interestingness) }}
-**Time span**: {{ time_span }}
-
-## Memories
+Cluster {{ cluster_id }} [{{ memory_count }} {{ 'memory' if memory_count == 1 else 'memories' }}, {{ time_span }}]
 
 {% for memory in memories %}
-### {{ loop.index }}. {{ memory.age }}
+{{ loop.index }}. [{{ memory.timestamp }}{{ memory.relative_time }}] {{ memory.content }}
 
-{{ memory.content }}
-
-{% if memory.marginalia %}
-*Metadata: {{ memory.marginalia }}*
-{% endif %}
-
----
 {% endfor %}

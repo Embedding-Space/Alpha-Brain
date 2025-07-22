@@ -61,20 +61,34 @@ async def get_cluster(
             current_time=TimeService.format_full(TimeService.now())
         )
     
+    # Sort memories chronologically first
+    sorted_memories = sorted(cluster.memories, key=lambda m: m.created_at)
+    
+    # Get the first memory's time as baseline
+    baseline_time = sorted_memories[0].created_at if sorted_memories else None
+    
     # Format all memories in the cluster
     memory_dicts = []
-    for memory in cluster.memories:
+    for memory in sorted_memories:
+        # Calculate relative time from first memory
+        if baseline_time:
+            time_diff = memory.created_at - baseline_time
+            minutes_diff = int(time_diff.total_seconds() / 60)
+            if minutes_diff == 0:
+                relative_time = ""
+            else:
+                relative_time = f" +{minutes_diff} min"
+        else:
+            relative_time = ""
+        
         memory_dict = {
             "id": str(memory.id),
             "content": memory.content,
-            "created_at": TimeService.format_datetime_scannable(memory.created_at),
-            "age": TimeService.format_age(memory.created_at),
+            "timestamp": TimeService.format_datetime_scannable(memory.created_at),
+            "relative_time": relative_time,
             "marginalia": memory.marginalia
         }
         memory_dicts.append(memory_dict)
-    
-    # Sort by created_at (oldest first for reading chronologically)
-    memory_dicts.sort(key=lambda m: m["created_at"])
     
     # Calculate normalized interestingness
     normalized_interestingness = cluster.interestingness_score / 10.0
