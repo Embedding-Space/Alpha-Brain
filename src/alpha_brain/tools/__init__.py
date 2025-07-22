@@ -5,6 +5,8 @@ from .add_identity_fact import add_identity_fact
 from .analyze_cluster import analyze_cluster
 from .create_knowledge import create_knowledge
 from .crystallize import crystallize
+from .find_clusters import find_clusters
+from .get_cluster import get_cluster
 from .get_knowledge import get_knowledge
 from .get_memory import get_memory
 from .health_check import health_check
@@ -22,6 +24,8 @@ __all__ = [
     "analyze_cluster",
     "create_knowledge",
     "crystallize",
+    "find_clusters",
+    "get_cluster",
     "get_knowledge",
     "get_memory",
     "health_check",

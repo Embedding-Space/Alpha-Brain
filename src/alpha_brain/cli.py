@@ -336,6 +336,130 @@ async def tools(
         sys.exit(1)
 
 
+@app.command(name="find-clusters")
+async def find_clusters_cmd(
+    query: str | None = None,
+    interval: str | None = None,
+    entities: list[str] | None = None,
+    min_interestingness: float = 0.0,
+    algorithm: str = "hdbscan",
+    similarity_threshold: float = 0.675,
+    min_cluster_size: int = 5,
+    limit: int = 20,
+    sort_by: str = "interestingness",
+    server: str = DEFAULT_MCP_URL,
+    raw: bool = False,
+) -> None:
+    """Find clusters of related memories with sophisticated filtering.
+    
+    This tool identifies groups of semantically similar memories with various
+    filtering options. Results are cached for efficient retrieval with get-cluster.
+    
+    Args:
+        query: Filter memories by semantic relevance to this query
+        interval: Filter memories by time interval (e.g., "last week", "July 2025")
+        entities: Filter to clusters containing ALL of these entities
+        min_interestingness: Minimum interestingness score (0-1 scale)
+        algorithm: Clustering algorithm (hdbscan, kmeans, dbscan, agglomerative)
+        similarity_threshold: Minimum similarity for clustering (0.675 default)
+        min_cluster_size: Minimum number of memories required in a cluster
+        limit: Maximum number of clusters to return
+        sort_by: How to sort results - "interestingness", "size", or "recency"
+        server: MCP server URL
+        raw: Show raw output without formatting
+    
+    Examples:
+        uv run alpha-brain find-clusters
+        uv run alpha-brain find-clusters --query "Project Alpha"
+        uv run alpha-brain find-clusters --entities Jeffery --entities Kylee
+        uv run alpha-brain find-clusters --interval "past week" --min-interestingness 0.7
+    """
+    try:
+        # Build parameters - only include non-None values
+        params = {
+            "algorithm": algorithm,
+            "similarity_threshold": similarity_threshold,
+            "min_cluster_size": min_cluster_size,
+            "limit": limit,
+            "sort_by": sort_by,
+        }
+        if query is not None:
+            params["query"] = query
+        if interval is not None:
+            params["interval"] = interval
+        if entities is not None and len(entities) > 0:
+            params["entities"] = entities
+        if min_interestingness > 0:
+            params["min_interestingness"] = min_interestingness
+        
+        async with Client(server) as client:
+            result = await client.call_tool("find_clusters", params)
+            
+            if raw:
+                # Show the raw CallToolResult structure
+                console.print(f"CallToolResult: {result}")
+                console.print(f"- data: {result.data}")
+                console.print(f"- content: {result.content}")
+                console.print(f"- structured_content: {result.structured_content}")
+                console.print(f"- is_error: {result.is_error}")
+            # Extract the text content
+            elif result.content and len(result.content) > 0:
+                text = result.content[0].text
+                console.print(text, highlight=False)
+            elif result.is_error:
+                console.print("[red]Error finding clusters[/red]", style="bold red")
+            else:
+                console.print("[yellow]No clusters found[/yellow]")
+                
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]", style="bold red")
+        sys.exit(1)
+
+
+@app.command(name="get-cluster")
+async def get_cluster_cmd(
+    cluster_id: str,
+    server: str = DEFAULT_MCP_URL,
+    raw: bool = False,
+) -> None:
+    """Retrieve a specific cluster from the cache.
+    
+    This command shows all memories in a cluster that was found by find-clusters.
+    You must run find-clusters first to populate the cache.
+    
+    Args:
+        cluster_id: The cluster ID from find-clusters output
+        server: MCP server URL
+        raw: Show raw output without formatting
+    
+    Example:
+        uv run alpha-brain get-cluster 0
+    """
+    try:
+        async with Client(server) as client:
+            result = await client.call_tool("get_cluster", {"cluster_id": cluster_id})
+            
+            if raw:
+                # Show the raw CallToolResult structure
+                console.print(f"CallToolResult: {result}")
+                console.print(f"- data: {result.data}")
+                console.print(f"- content: {result.content}")
+                console.print(f"- structured_content: {result.structured_content}")
+                console.print(f"- is_error: {result.is_error}")
+            # Extract the text content
+            elif result.content and len(result.content) > 0:
+                text = result.content[0].text
+                console.print(text, highlight=False)
+            elif result.is_error:
+                console.print("[red]Error getting cluster[/red]", style="bold red")
+            else:
+                console.print("[yellow]No cluster data available[/yellow]")
+                
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]", style="bold red")
+        sys.exit(1)
+
+
 @app.command(name="get-memory")
 async def get_memory_cmd(
     memory_id: str,

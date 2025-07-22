@@ -11,6 +11,8 @@ from alpha_brain.tools import (
     analyze_cluster,
     create_knowledge,
     crystallize,
+    find_clusters,
+    get_cluster,
     get_knowledge,
     get_memory,
     health_check,
@@ -115,6 +117,8 @@ mcp.tool(remember)
 mcp.tool(search)
 mcp.tool(crystallize)
 mcp.tool(analyze_cluster)
+mcp.tool(find_clusters)
+mcp.tool(get_cluster)
 mcp.tool(get_memory)
 mcp.tool(create_knowledge)
 mcp.tool(get_knowledge)

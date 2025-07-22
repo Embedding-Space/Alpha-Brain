@@ -186,6 +186,35 @@ class TimeService:
         return parsed.isoformat()
 
     @classmethod
+    def format_age_difference(cls, start_dt: str | datetime | DateTime, end_dt: str | datetime | DateTime) -> str:
+        """Format the time difference between two datetimes as human-readable.
+        
+        Args:
+            start_dt: The start datetime
+            end_dt: The end datetime
+            
+        Returns:
+            Human-readable time difference (e.g., "5 days", "2 hours", "1 minute")
+        """
+        start_parsed = cls.parse(start_dt)
+        end_parsed = cls.parse(end_dt)
+        
+        diff = end_parsed - start_parsed
+        total_seconds = diff.total_seconds()
+        
+        if total_seconds < 60:
+            return "less than a minute"
+        elif total_seconds < 3600:  # Less than 1 hour
+            minutes = int(total_seconds / 60)
+            return f"{minutes} minute{'s' if minutes != 1 else ''}"
+        elif total_seconds < 86400:  # Less than 1 day
+            hours = int(total_seconds / 3600)
+            return f"{hours} hour{'s' if hours != 1 else ''}"
+        else:
+            days = int(total_seconds / 86400)
+            return f"{days} day{'s' if days != 1 else ''}"
+
+    @classmethod
     def format_for_context(
         cls, dt: str | datetime | DateTime, include_age: bool = True
     ) -> str:

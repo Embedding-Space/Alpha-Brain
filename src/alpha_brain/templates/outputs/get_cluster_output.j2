@@ -1,0 +1,21 @@
+{{ current_time }}
+
+# Cluster {{ cluster_id }} Details
+
+**Size**: {{ memory_count }} {{ 'memory' if memory_count == 1 else 'memories' }}
+**Similarity**: {{ "%.3f"|format(similarity) }} | **Interestingness**: {{ "%.2f"|format(interestingness) }}
+**Time span**: {{ time_span }}
+
+## Memories
+
+{% for memory in memories %}
+### {{ loop.index }}. {{ memory.age }}
+
+{{ memory.content }}
+
+{% if memory.marginalia %}
+*Metadata: {{ memory.marginalia }}*
+{% endif %}
+
+---
+{% endfor %}
