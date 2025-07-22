@@ -1,44 +1,10 @@
 {{ current_time }}
 
-# Memory Cluster Analysis
-
-{% if mode == "query+interval" %}
-Searching for clusters matching "{{ query }}" in {{ interval }}...
-{% elif mode == "query" %}
-Searching for clusters matching "{{ query }}"...
-{% elif mode == "interval" %}
-Searching for clusters in {{ interval }}...
-{% else %}
-Exploring recent memory clusters...
-{% endif %}
-
-{% if entity_filter %}
-Filtering to clusters containing all entities: {{ entity_filter|join(", ") }}
-{% endif %}
-
-Found {{ cluster_count }} interesting {{ 'cluster' if cluster_count == 1 else 'clusters' }} from {{ filtered_count }} memories ({{ total_count }} total).
-
 {% if candidates %}
-## Clusters
-
 {% for cluster in candidates %}
-### Cluster {{ cluster.cluster_id }} ({{ cluster.memory_count }} {{ 'memory' if cluster.memory_count == 1 else 'memories' }})
+Cluster {{ cluster.cluster_id }} [{{ cluster.memory_count }} {{ 'memory' if cluster.memory_count == 1 else 'memories' }}, {{ "%.2f"|format(cluster.interestingness) }}]: {% if cluster.centroid_preview %}{{ cluster.centroid_preview.content }}{% else %}(no preview available){% endif %}
 
-**Interestingness**: {{ "%.2f"|format(cluster.interestingness) }} | **Similarity**: {{ "%.3f"|format(cluster.similarity) }}
-**Time span**: {{ cluster.time_span }} | **Age**: {{ cluster.age }}
-{% if cluster.entities %}
-**Entities** ({{ cluster.entity_count }} total): {{ cluster.entities|join(", ") }}{% if cluster.entity_count > 5 %}...{% endif %}
-{% endif %}
-
-{% if cluster.centroid_preview %}
-**Preview** ({{ cluster.centroid_preview.timestamp }}):
-> {{ cluster.centroid_preview.content }}
-{% endif %}
-
----
 {% endfor %}
-
-Use `get_cluster(cluster_id="<id>")` to see all memories in a cluster.
 {% else %}
 No clusters found matching your criteria.
 {% endif %}
