@@ -66,6 +66,13 @@ just test-logs   # View test container logs
 uv run python script.py    # ✅ Correct - picks up virtual environment
 python script.py          # ❌ Wrong - won't find dependencies
 
+# Dynamic CLI (auto-generates commands from MCP tools)
+uv run alpha-brain list-tools           # See all available MCP tools
+uv run alpha-brain help-tool remember   # Get help for a specific tool
+uv run alpha-brain whoami               # Get current context and identity
+uv run alpha-brain remember --content "Hello world"  # Call any MCP tool
+uv run alpha-brain search --query "alpha brain" --limit 5
+
 # Code quality
 just lint        # Check code style with Ruff
 just fix         # Auto-fix style issues
@@ -102,6 +109,14 @@ just clean-cache # Clean Python cache files
 - `src/alpha_brain/` at root, Docker copies to `/app/src/alpha_brain/`
 - **Important**: Bind mounts must match Docker structure (see Docker section below)
 - Tools are in `tools/` subdirectory for clean separation
+
+### Dynamic CLI Architecture
+- **Problem**: Maintaining a static CLI that mirrors MCP tools is a losing battle
+- **Solution**: Dynamic CLI that auto-generates commands from MCP server tools
+- `alpha-brain list-tools` fetches available tools from the server
+- `alpha-brain <tool-name> --arg value` dynamically calls any MCP tool
+- No more manual CLI updates when adding/changing tools
+- Single source of truth: the MCP server's tool definitions
 
 ### Memory Pipeline
 1. Prose input → Dual embeddings (semantic + emotional)
@@ -202,14 +217,11 @@ memory = await service.get_by_id(
 - `MemoryOutput`: Contains `memory` (Memory object), `similarity` score, and formatted timestamps
 - `Memory`: SQLAlchemy model with `id`, `content`, `created_at`, `marginalia`, embeddings
 
-#### CrystallizationService (`crystallization_service.py`)
-Singleton service for clustering memories and extracting knowledge.
+#### MemoryService Clustering Methods
+
+MemoryService now includes clustering functionality:
 
 ```python
-# Get the singleton
-from alpha_brain.crystallization_service import get_crystallization_service
-service = get_crystallization_service()
-
 # Cluster memories
 clusters = service.cluster_memories(
     memories: list[Memory],
@@ -218,26 +230,18 @@ clusters = service.cluster_memories(
     n_clusters: int | None = None      # Only for kmeans method
 ) -> list[ClusterCandidate]
 
-# Available clustering methods (configured in __init__):
+# Available clustering methods (configured in memory_service.py):
 # - "hdbscan" (default): Finds variable-sized clusters
 # - "dbscan": Density-based clustering
 # - "agglomerative": Hierarchical clustering
 # - "kmeans": Requires n_clusters parameter
-
-# Analyze clusters with Helper
-results = await service.analyze_clusters_with_helper(
-    clusters: list[ClusterCandidate],
-    similarity_threshold: float,
-    max_clusters: int | None = None
-) -> CrystallizationResult
 ```
 
-**Key Objects:**
+**Cluster Objects:**
 - `ClusterCandidate`: Has `cluster_id`, `memories`, `similarity` score, plus:
   - `radius`: Max distance from centroid (cluster tightness)
   - `density_std`: Standard deviation of distances (density measure)
   - `interestingness_score`: Combined metric (size × tightness)
-- `CrystallizationResult`: Contains `analyses`, `total_clusters`, `analyzed_clusters`, timing info
 
 #### KnowledgeService (`knowledge_service.py`)
 Singleton service for managing structured knowledge documents.
@@ -382,21 +386,6 @@ directives = await service.get_all_directives() -> list[PersonalityDirective]
 
 ### Helper Services
 
-#### CrystallizationHelper (`crystallization_helper.py`)
-Analyzes memory clusters using LLM interviews.
-
-```python
-from alpha_brain.crystallization_helper import get_crystallization_helper
-helper = get_crystallization_helper()
-
-# Analyze a cluster
-analysis = await helper.analyze_cluster(
-    memories: list[Memory],
-    similarity_score: float
-) -> ClusterAnalysis
-```
-
-**Questions loaded from:** `src/alpha_brain/model_inputs/analysis_input.json`
 
 #### MemoryHelper (`memory_helper.py`)
 Extracts entities and metadata from memories.

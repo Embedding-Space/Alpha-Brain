@@ -1,14 +1,14 @@
 """Find clusters of related memories with sophisticated filtering."""
 
 from fastmcp import Context
-from sqlalchemy import select, text, and_, func
+from sqlalchemy import func, select, text
 from structlog import get_logger
 
 from alpha_brain.database import get_db
 from alpha_brain.entity_service import get_entity_service
 from alpha_brain.interval_parser import parse_interval
 from alpha_brain.memory_service import get_memory_service
-from alpha_brain.schema import Memory, Entity
+from alpha_brain.schema import Entity, Memory
 from alpha_brain.templates import render_output
 from alpha_brain.time_service import TimeService
 

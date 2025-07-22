@@ -9,7 +9,7 @@ from uuid import UUID
 
 import numpy as np
 import pendulum
-from sklearn.cluster import AgglomerativeClustering, DBSCAN, HDBSCAN, KMeans
+from sklearn.cluster import DBSCAN, HDBSCAN, AgglomerativeClustering, KMeans
 from sklearn.metrics.pairwise import cosine_similarity
 from sqlalchemy import select
 from structlog import get_logger
@@ -739,6 +739,120 @@ class MemoryService:
             )
             return None
 
+    def _extract_embeddings(
+        self,
+        memories: list[Memory],
+        embedding_type: Literal["semantic", "emotional"]
+    ) -> np.ndarray:
+        """Extract embeddings from memories as numpy array."""
+        if embedding_type == "semantic":
+            embeddings = []
+            for m in memories:
+                if m.semantic_embedding is not None:
+                    # Handle string-encoded embeddings
+                    if isinstance(m.semantic_embedding, str):
+                        emb = json.loads(m.semantic_embedding)
+                    else:
+                        emb = m.semantic_embedding
+                    embeddings.append(np.array(emb))
+                else:
+                    embeddings.append(np.zeros(768))
+            return np.array(embeddings)
+        embeddings = []
+        for m in memories:
+            if m.emotional_embedding is not None:
+                # Handle string-encoded embeddings
+                if isinstance(m.emotional_embedding, str):
+                    emb = json.loads(m.emotional_embedding)
+                else:
+                    emb = m.emotional_embedding
+                embeddings.append(np.array(emb))
+            else:
+                embeddings.append(np.zeros(7))
+        return np.array(embeddings)
+
+    def _apply_clustering_algorithm(
+        self,
+        embeddings: np.ndarray,
+        algorithm: ClusterAlgorithm,
+        similarity_threshold: float,
+        n_clusters: int | None,
+        memory_count: int
+    ) -> np.ndarray:
+        """Apply the selected clustering algorithm."""
+        if algorithm == "hdbscan":
+            return self._cluster_hdbscan(embeddings, similarity_threshold)
+        if algorithm == "dbscan":
+            return self._cluster_dbscan(embeddings, similarity_threshold)
+        if algorithm == "agglomerative":
+            return self._cluster_agglomerative(embeddings, similarity_threshold)
+        if algorithm == "kmeans":
+            if n_clusters is None:
+                import math
+                n_clusters = max(2, int(math.sqrt(memory_count)))
+            return self._cluster_kmeans(embeddings, n_clusters)
+        raise ValueError(f"Unknown algorithm: {algorithm}")
+
+    def _create_cluster_candidates(
+        self,
+        labels: np.ndarray,
+        memories: list[Memory],
+        embeddings: np.ndarray
+    ) -> list[ClusterCandidate]:
+        """Create ClusterCandidate objects from clustering results."""
+        # Group memories by cluster
+        clusters: dict[int, list[Memory]] = {}
+        for idx, label in enumerate(labels):
+            if label == -1:  # Skip noise points
+                continue
+            if label not in clusters:
+                clusters[label] = []
+            clusters[label].append(memories[idx])
+            
+        # Create ClusterCandidate objects
+        candidates = []
+        for cluster_id, cluster_memories in clusters.items():
+            # Calculate average similarity within cluster
+            cluster_indices = [i for i, label in enumerate(labels) if label == cluster_id]
+            cluster_embeddings = embeddings[cluster_indices]
+            
+            if len(cluster_memories) > 1:
+                similarity_matrix = cosine_similarity(cluster_embeddings)
+                # Average of upper triangle (excluding diagonal)
+                mask = np.triu(np.ones_like(similarity_matrix, dtype=bool), k=1)
+                avg_similarity = similarity_matrix[mask].mean()
+            else:
+                avg_similarity = 1.0  # Single-memory cluster
+                
+            candidate = ClusterCandidate(
+                cluster_id=cluster_id,
+                memories=cluster_memories,
+                similarity=avg_similarity,
+                embeddings=cluster_embeddings
+            )
+            
+            # Calculate centroid and find closest memory
+            if len(cluster_memories) > 0 and cluster_indices and max(cluster_indices) < len(embeddings):
+                # Note: centroid is already calculated in ClusterCandidate
+                centroid = candidate.centroid if candidate.centroid is not None else cluster_embeddings.mean(axis=0)
+                
+                # Find memory closest to centroid
+                distances = cosine_similarity([centroid], cluster_embeddings)[0]
+                closest_idx = np.argmax(distances)
+                
+                # Map back to the memory - ensure index is valid
+                if closest_idx < len(cluster_indices):
+                    memory_idx = cluster_indices[closest_idx]
+                    if memory_idx < len(memories):
+                        candidate.centroid_memory = memories[memory_idx]
+                        candidate.centroid_distance = distances[closest_idx]
+            
+            candidates.append(candidate)
+            
+        # Sort by cluster size (larger clusters first)
+        candidates.sort(key=lambda c: c.memory_count, reverse=True)
+        return candidates
+
     def cluster_memories(
         self, 
         memories: list[Memory], 
@@ -778,109 +892,22 @@ class MemoryService:
             threshold=similarity_threshold
         )
         
-        # Extract embeddings as numpy array
-        if embedding_type == "semantic":
-            embeddings = []
-            for m in memories:
-                if m.semantic_embedding is not None:
-                    # Handle string-encoded embeddings
-                    if isinstance(m.semantic_embedding, str):
-                        emb = json.loads(m.semantic_embedding)
-                    else:
-                        emb = m.semantic_embedding
-                    embeddings.append(np.array(emb))
-                else:
-                    embeddings.append(np.zeros(768))
-            embeddings = np.array(embeddings)
-        else:
-            embeddings = []
-            for m in memories:
-                if m.emotional_embedding is not None:
-                    # Handle string-encoded embeddings
-                    if isinstance(m.emotional_embedding, str):
-                        emb = json.loads(m.emotional_embedding)
-                    else:
-                        emb = m.emotional_embedding
-                    embeddings.append(np.array(emb))
-                else:
-                    embeddings.append(np.zeros(7))
-            embeddings = np.array(embeddings)
+        # Extract embeddings
+        embeddings = self._extract_embeddings(memories, embedding_type)
             
         # Apply clustering algorithm
-        if algorithm == "hdbscan":
-            labels = self._cluster_hdbscan(embeddings, similarity_threshold)
-        elif algorithm == "dbscan":
-            labels = self._cluster_dbscan(embeddings, similarity_threshold)
-        elif algorithm == "agglomerative":
-            labels = self._cluster_agglomerative(embeddings, similarity_threshold)
-        elif algorithm == "kmeans":
-            if n_clusters is None:
-                # This shouldn't happen if tool is used properly, but have a fallback
-                import math
-                n_clusters = max(2, int(math.sqrt(len(memories))))
-            labels = self._cluster_kmeans(embeddings, n_clusters)
-        else:
-            raise ValueError(f"Unknown algorithm: {algorithm}")
+        labels = self._apply_clustering_algorithm(
+            embeddings, algorithm, similarity_threshold, n_clusters, len(memories)
+        )
             
-        # Group memories by cluster
-        clusters: dict[int, list[Memory]] = {}
-        for idx, label in enumerate(labels):
-            if label == -1:  # Skip noise points
-                continue
-            if label not in clusters:
-                clusters[label] = []
-            clusters[label].append(memories[idx])
-            
-        # Create ClusterCandidate objects
-        candidates = []
-        for cluster_id, cluster_memories in clusters.items():
-            # Calculate average similarity within cluster
-            cluster_indices = [i for i, l in enumerate(labels) if l == cluster_id]
-            cluster_embeddings = embeddings[cluster_indices]
-            
-            if len(cluster_memories) > 1:
-                similarity_matrix = cosine_similarity(cluster_embeddings)
-                # Average of upper triangle (excluding diagonal)
-                mask = np.triu(np.ones_like(similarity_matrix, dtype=bool), k=1)
-                avg_similarity = similarity_matrix[mask].mean()
-            else:
-                avg_similarity = 1.0  # Single-memory cluster
-                
-            candidate = ClusterCandidate(
-                cluster_id=cluster_id,
-                memories=cluster_memories,
-                similarity=avg_similarity,
-                embeddings=cluster_embeddings
-            )
-            
-            # Calculate centroid and find closest memory
-            if len(cluster_memories) > 0:
-                # Safety check - ensure we have valid indices
-                if cluster_indices and max(cluster_indices) < len(embeddings):
-                    # Note: centroid is already calculated in ClusterCandidate
-                    centroid = candidate.centroid if candidate.centroid is not None else cluster_embeddings.mean(axis=0)
-                    
-                    # Find memory closest to centroid
-                    distances = cosine_similarity([centroid], cluster_embeddings)[0]
-                    closest_idx = np.argmax(distances)
-                    
-                    # Map back to the memory - ensure index is valid
-                    if closest_idx < len(cluster_indices):
-                        memory_idx = cluster_indices[closest_idx]
-                        if memory_idx < len(memories):
-                            candidate.centroid_memory = memories[memory_idx]
-                            candidate.centroid_distance = distances[closest_idx]
-            
-            candidates.append(candidate)
-            
-        # Sort by cluster size (larger clusters first)
-        candidates.sort(key=lambda c: c.memory_count, reverse=True)
+        # Create cluster candidates
+        candidates = self._create_cluster_candidates(labels, memories, embeddings)
         
         logger.info(
             "Clustering complete",
             total_memories=len(memories),
             clusters_found=len(candidates),
-            noise_points=sum(1 for l in labels if l == -1)
+            noise_points=sum(1 for label in labels if label == -1)
         )
         
         # Cache the results
