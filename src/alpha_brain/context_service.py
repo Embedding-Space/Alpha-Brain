@@ -47,17 +47,10 @@ class ContextService:
         if ttl:
             # Parse duration string like "3d", "1h", "30m"
             try:
-                # pendulum.parse doesn't handle simple durations, use dateparser
-                import dateparser
-                future_time = dateparser.parse(f"in {ttl}")
-                if future_time:
-                    duration = future_time - datetime.now(UTC)
-                    expires_at = datetime.now(UTC) + duration
-                    # Convert to PostgreSQL interval
-                    from datetime import timedelta
-                    interval = timedelta(seconds=duration.total_seconds())
-                else:
-                    raise ValueError(f"Could not parse TTL: {ttl}")
+                # Use centralized duration parsing from TimeService
+                from alpha_brain.time_service import TimeService
+                interval = TimeService.parse_duration(ttl)
+                expires_at = datetime.now(UTC) + interval
             except Exception as e:
                 raise ValueError(f"Invalid TTL format: {ttl}. Use formats like '3d', '1h', '30m'") from e
         

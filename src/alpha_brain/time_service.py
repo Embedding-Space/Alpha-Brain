@@ -273,3 +273,91 @@ class TimeService:
         date_time_part = parsed.format("M/D/YYYY h:mm A")
         tz_abbr = parsed.format("zz")
         return f"{date_time_part} {tz_abbr}"
+    
+    @classmethod
+    def parse_duration(cls, duration_str: str) -> timedelta:
+        """Parse a duration string into a timedelta.
+        
+        Supports formats like:
+        - "3h", "1h", "30m", "5d", "1w"
+        - "3 hours", "1 hour", "30 minutes", "5 days", "1 week"
+        - "P3D" (ISO 8601 duration)
+        - "3600" (raw seconds)
+        
+        Args:
+            duration_str: The duration string to parse
+            
+        Returns:
+            timedelta object
+            
+        Raises:
+            ValueError: If the duration cannot be parsed
+        """
+        import re
+        
+        # Try raw seconds first
+        if duration_str.isdigit():
+            return timedelta(seconds=int(duration_str))
+        
+        # Try ISO 8601 duration (P3D, PT4H, etc.)
+        if duration_str.startswith("P"):
+            from alpha_brain.interval_parser import parse_duration as parse_iso_duration
+            try:
+                duration = parse_iso_duration(duration_str)
+                return timedelta(seconds=duration.total_seconds())
+            except Exception:
+                pass  # Fall through to other formats
+        
+        # Try abbreviated formats (3h, 1d, etc.)
+        abbrev_pattern = r"^(\d+(?:\.\d+)?)\s*([hdwmsy])$"
+        match = re.match(abbrev_pattern, duration_str.lower().strip())
+        if match:
+            value = float(match.group(1))
+            unit = match.group(2)
+            
+            if unit == "s":
+                return timedelta(seconds=value)
+            elif unit == "m":
+                return timedelta(minutes=value)
+            elif unit == "h":
+                return timedelta(hours=value)
+            elif unit == "d":
+                return timedelta(days=value)
+            elif unit == "w":
+                return timedelta(weeks=value)
+            elif unit == "y":
+                return timedelta(days=value * 365)  # Approximate
+        
+        # Try natural language formats (3 hours, 1 day, etc.)
+        natural_pattern = r"^(\d+(?:\.\d+)?)\s+(second|minute|hour|day|week|month|year)s?$"
+        match = re.match(natural_pattern, duration_str.lower().strip())
+        if match:
+            value = float(match.group(1))
+            unit = match.group(2)
+            
+            if unit == "second":
+                return timedelta(seconds=value)
+            elif unit == "minute":
+                return timedelta(minutes=value)
+            elif unit == "hour":
+                return timedelta(hours=value)
+            elif unit == "day":
+                return timedelta(days=value)
+            elif unit == "week":
+                return timedelta(weeks=value)
+            elif unit == "month":
+                return timedelta(days=value * 30)  # Approximate
+            elif unit == "year":
+                return timedelta(days=value * 365)  # Approximate
+        
+        # If all else fails, try dateparser with "in X" format
+        try:
+            import dateparser
+            future_time = dateparser.parse(f"in {duration_str}")
+            if future_time:
+                now = datetime.now(UTC)
+                return future_time - now
+        except Exception:
+            pass
+        
+        raise ValueError(f"Cannot parse duration: {duration_str}")
