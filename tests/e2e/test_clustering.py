@@ -1,7 +1,8 @@
 """Test memory clustering functionality."""
 
-import pytest
 import asyncio
+
+import pytest
 
 
 @pytest.mark.asyncio

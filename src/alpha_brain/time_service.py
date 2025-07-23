@@ -317,15 +317,15 @@ class TimeService:
             
             if unit == "s":
                 return timedelta(seconds=value)
-            elif unit == "m":
+            if unit == "m":
                 return timedelta(minutes=value)
-            elif unit == "h":
+            if unit == "h":
                 return timedelta(hours=value)
-            elif unit == "d":
+            if unit == "d":
                 return timedelta(days=value)
-            elif unit == "w":
+            if unit == "w":
                 return timedelta(weeks=value)
-            elif unit == "y":
+            if unit == "y":
                 return timedelta(days=value * 365)  # Approximate
         
         # Try natural language formats (3 hours, 1 day, etc.)
@@ -337,17 +337,17 @@ class TimeService:
             
             if unit == "second":
                 return timedelta(seconds=value)
-            elif unit == "minute":
+            if unit == "minute":
                 return timedelta(minutes=value)
-            elif unit == "hour":
+            if unit == "hour":
                 return timedelta(hours=value)
-            elif unit == "day":
+            if unit == "day":
                 return timedelta(days=value)
-            elif unit == "week":
+            if unit == "week":
                 return timedelta(weeks=value)
-            elif unit == "month":
+            if unit == "month":
                 return timedelta(days=value * 30)  # Approximate
-            elif unit == "year":
+            if unit == "year":
                 return timedelta(days=value * 365)  # Approximate
         
         # If all else fails, try dateparser with "in X" format

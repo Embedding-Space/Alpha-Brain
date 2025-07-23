@@ -199,17 +199,36 @@ async def search(ctx: Context, query: str | None = None, limit: int = 10, interv
     
     # Wall 3: Full-text search for exact word matches
     fulltext_memories = []
+    
+    # Parse interval if provided for full-text search
+    if interval:
+        from alpha_brain.interval_parser import parse_interval
+        start_time, end_time = parse_interval(interval)
+    
     async with get_db() as session:
-        # Use PostgreSQL full-text search with plainto_tsquery
-        stmt = text("""
-            SELECT id, content, created_at
-            FROM memories 
-            WHERE search_vector @@ plainto_tsquery('english', :query)
-            ORDER BY ts_rank(search_vector, plainto_tsquery('english', :query)) DESC
-            LIMIT :limit
-        """)
+        # Build query with optional time filter
+        if interval:
+            stmt = text("""
+                SELECT id, content, created_at
+                FROM memories 
+                WHERE search_vector @@ plainto_tsquery('english', :query)
+                  AND created_at >= :start_time
+                  AND created_at <= :end_time
+                ORDER BY ts_rank(search_vector, plainto_tsquery('english', :query)) DESC
+                LIMIT :limit
+            """)
+            params = {"query": query, "limit": limit, "start_time": start_time, "end_time": end_time}
+        else:
+            stmt = text("""
+                SELECT id, content, created_at
+                FROM memories 
+                WHERE search_vector @@ plainto_tsquery('english', :query)
+                ORDER BY ts_rank(search_vector, plainto_tsquery('english', :query)) DESC
+                LIMIT :limit
+            """)
+            params = {"query": query, "limit": limit}
         
-        result = await session.execute(stmt, {"query": query, "limit": limit})
+        result = await session.execute(stmt, params)
         rows = result.fetchall()
         
         for row in rows:
@@ -247,7 +266,8 @@ async def search(ctx: Context, query: str | None = None, limit: int = 10, interv
         semantic_memories = await memory_service.search(
             query=query,
             search_type="semantic",
-            limit=limit
+            limit=limit,
+            interval=interval
         )
         emotional_memories = []
         search_mode = "semantic"
@@ -256,12 +276,14 @@ async def search(ctx: Context, query: str | None = None, limit: int = 10, interv
         semantic_memories = await memory_service.search(
             query=query,
             search_type="semantic",
-            limit=limit
+            limit=limit,
+            interval=interval
         )
         emotional_memories = await memory_service.search(
             query=query,
             search_type="emotional",
-            limit=limit
+            limit=limit,
+            interval=interval
         )
         search_mode = "both"
     

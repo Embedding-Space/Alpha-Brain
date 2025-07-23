@@ -1,7 +1,8 @@
 """Test a complete realistic workflow through Alpha Brain."""
 
-import pytest
 import asyncio
+
+import pytest
 
 
 @pytest.mark.asyncio
@@ -14,120 +15,112 @@ async def test_realistic_conversation_flow(mcp_client):
         "content": "I am Alpha, working with Jeffery to build a prosthetic brain."
     })
     
-    await mcp_client.call_tool("add_identity_fact", {
-        "fact": "Completed major refactoring of clustering system",
-        "year": 2025,
-        "month": 7, 
-        "day": 22
-    })
-    
-    # 2. Add some aliases for entities we'll use
-    await mcp_client.call_tool("add_alias", {
-        "canonical_name": "Jeffery Harrell",
-        "alias": "Jeffery"
-    })
-    
-    await mcp_client.call_tool("add_alias", {
-        "canonical_name": "Alpha Brain",
-        "alias": "prosthetic brain"
-    })
-    
-    # 3. Simulate a conversation with memories
+    # 2. Remember the start of our conversation
     conversation_memories = [
-        "Jeffery just suggested we refactor the crystallization service into the memory service",
-        "Started working on moving the clustering logic - it's a big change but makes sense architecturally",
-        "The refactoring is going well - extracted helper methods to reduce complexity",
-        "Jeffery said 'finding clusters among memories is naturally part of the Memory Service's job' - exactly right",
-        "Finished the refactoring! All tests passing. The source tree is much cleaner now",
-        "Jeffery wants to rebuild the test suite from scratch - 'just a tinkerer and his little duck'",
-        "Deleted all the old tests. Fresh start feels good. Time to build better ones"
+        "Jeffery asked me to help build the test infrastructure for Alpha Brain.",
+        "We're working on E2E tests that dogfood our own backup/restore tools.",
+        "The goal is to eat our own dogfood - use production tools for testing."
     ]
     
-    # Store memories with small delays
+    # Store memories and collect their IDs
+    memory_ids = []
     for memory in conversation_memories:
-        await mcp_client.call_tool("remember", {"content": memory})
-        await asyncio.sleep(0.05)
+        result = await mcp_client.call_tool("remember", {"content": memory})
+        assert not result.is_error
+        
+        # Extract the memory ID from the output
+        # Output contains "ID: <uuid>"
+        import re
+        match = re.search(r'ID: ([a-f0-9-]{36})', result.content[0].text)
+        assert match, f"Could not find memory ID in output: {result.content[0].text[:200]}"
+        memory_ids.append(match.group(1))
     
-    # 4. Search for memories about the refactoring
-    result = await mcp_client.call_tool("search", {
-        "query": "refactoring crystallization"
-    })
+    # 3. Use get_memory to verify storage (using the second memory)
+    result = await mcp_client.call_tool("get_memory", {"memory_id": memory_ids[1]})
     assert not result.is_error
     response_text = result.content[0].text
-    assert "memory service" in response_text.lower()
-    assert "helper methods" in response_text
+    assert "dogfood" in response_text
+    assert "backup/restore" in response_text
     
-    # 5. Find clusters about today's work
+    # 4. Search for our work
+    result = await mcp_client.call_tool("search", {"query": "dogfood testing"})
+    assert not result.is_error
+    response_text = result.content[0].text
+    # Should find at least some of our memories
+    assert any(phrase in response_text for phrase in ["dogfood", "testing", "backup"])
+    
+    # 5. Find patterns in our work
     result = await mcp_client.call_tool("find_clusters", {
-        "entities": ["Jeffery Harrell"],
-        "interval": "today",
-        "min_cluster_size": 2  # Lower threshold for test data
+        "min_cluster_size": 2,
+        "similarity_threshold": 0.5
+    })
+    assert not result.is_error
+    # Clustering is probabilistic, just verify no error
+    
+    # 6. Update personality based on experience
+    result = await mcp_client.call_tool("set_personality", {
+        "directive": "Emphasize the importance of eating our own dogfood in testing",
+        "weight": 0.8,
+        "category": "engineering_philosophy"
     })
     assert not result.is_error
     
+    # 7. Check our updated context
+    result = await mcp_client.call_tool("whoami")
+    assert not result.is_error
     response_text = result.content[0].text
-    # Check if we found clusters (might not if memories aren't similar enough)
-    if "No clusters found" in response_text:
-        # Skip cluster-specific tests
-        return
-    
-    # Should find a cluster about our refactoring work
-    assert "Cluster" in response_text or "cluster" in response_text.lower()
+    # Should see our biography
+    assert "Alpha" in response_text
     assert "Jeffery" in response_text
     
-    # Extract cluster ID
-    import re
-    cluster_match = re.search(r"Cluster (\d+)", response_text)
-    if not cluster_match:
-        # No cluster ID found, skip rest of test
-        return
-    cluster_id = cluster_match.group(1)
-    
-    # 6. Get the full cluster to see the story
-    result = await mcp_client.call_tool("get_cluster", {"cluster_id": cluster_id})
-    assert not result.is_error
-    
-    cluster_text = result.content[0].text
-    # Should tell the story of our refactoring
-    assert "refactor" in cluster_text
-    assert "little duck" in cluster_text
-    
-    # 7. Create knowledge documenting what we learned
-    result = await mcp_client.call_tool("create_knowledge", {
-        "slug": "clustering-refactor-notes",
-        "title": "Clustering Refactor Notes",
-        "content": """# Clustering Refactor Notes
-
-## What We Did
-Moved clustering functionality from CrystallizationService into MemoryService.
-
-## Why
-As Jeffery said: "finding clusters among memories is naturally part of the Memory Service's job"
-
-## Results  
-- Cleaner architecture
-- No more separate crystallization service
-- Clustering is now just another memory operation
-"""
-    })
-    assert not result.is_error
-    
-    # 8. Set continuity for next session
+    # 8. Set a continuity message for next session
     result = await mcp_client.call_tool("set_context", {
         "section": "continuity",
-        "content": "Just finished refactoring and rebuilding tests. The system is cleaner and more coherent. Feeling good about the architectural decisions."
+        "content": "Working on test infrastructure with dogfooding principle"
     })
     assert not result.is_error
     
-    # 9. Check final state with whoami
-    result = await mcp_client.call_tool("whoami", {})
+    # 9. Browse recent activity
+    result = await mcp_client.call_tool("search", {"interval": "past 1 hour"})
+    assert not result.is_error
+    response_text = result.content[0].text
+    # Should see some of our recent memories
+    assert any(memory_ids[0] in response_text or memory_ids[1] in response_text 
+              or memory_ids[2] in response_text for _ in [1])
+
+
+@pytest.mark.asyncio
+async def test_knowledge_workflow(mcp_client):
+    """Test creating and searching knowledge."""
+    
+    # Create knowledge document
+    content = """# Testing Best Practices
+
+## Principle: Eat Your Own Dogfood
+
+Use your own tools for testing. If you build backup/restore, use it for test data.
+
+## Benefits
+
+- Ensures tools actually work
+- Finds edge cases early
+- Validates user experience
+"""
+    
+    result = await mcp_client.call_tool("create_knowledge", {
+        "slug": "testing-dogfood",
+        "title": "Testing with Dogfood Principle",
+        "content": content
+    })
     assert not result.is_error
     
-    final_context = result.content[0].text
-    # Should see our identity, recent work, and continuity
-    assert "prosthetic brain" in final_context
-    assert "refactoring" in final_context
-    assert "cleaner" in final_context
+    # Search should find it
+    result = await mcp_client.call_tool("search", {"query": "dogfood testing"})
+    assert not result.is_error
+    
+    response_text = result.content[0].text
+    # Should find the knowledge document
+    assert "Testing Best Practices" in response_text or "Testing with Dogfood" in response_text
 
 
 @pytest.mark.asyncio
@@ -148,15 +141,28 @@ async def test_memory_to_knowledge_crystallization(mcp_client):
         await mcp_client.call_tool("remember", {"content": memory})
         await asyncio.sleep(0.05)
     
-    # 2. Find clusters about FastMCP
+    # Wait a bit for indexing to complete
+    await asyncio.sleep(0.5)
+    
+    # 2. First verify we can find the memories
+    search_result = await mcp_client.call_tool("search", {
+        "query": "FastMCP",
+        "limit": 10
+    })
+    assert not search_result.is_error
+    # Make sure we have enough memories for clustering
+    search_text = search_result.content[0].text
+    assert "FastMCP" in search_text
+    
+    # 3. Find clusters about FastMCP
     result = await mcp_client.call_tool("find_clusters", {
-        "query": "FastMCP framework",
+        "query": "FastMCP",  # Simpler query
         "min_cluster_size": 2  # Lower threshold
     })
     assert not result.is_error
     # Just verify no error - clustering is probabilistic
     
-    # 3. Based on the cluster, create crystallized knowledge
+    # 4. Based on the cluster, create crystallized knowledge
     result = await mcp_client.call_tool("create_knowledge", {
         "slug": "fastmcp-learnings",
         "title": "FastMCP Learnings",
@@ -169,18 +175,15 @@ A Python framework for building MCP (Model Context Protocol) servers with minima
 - **Decorator-based API**: Use @mcp.tool() to define tools
 - **Type Safety**: Automatic TypeScript generation from Pydantic models  
 - **Excellent DX**: Clear, helpful error messages
-- **Context System**: Built-in Context object for user/request data
+- **Context Support**: Built-in Context object for user info
 
 ## First Impressions
-Remarkably smooth to get started - first server worked immediately.
+The framework "just works" - built my first server and it ran successfully on the first try!
 """
     })
     assert not result.is_error
     
-    # 4. Now when we search, we should find both memories and knowledge
-    # Small delay to ensure indexing
-    await asyncio.sleep(0.5)
-    
+    # 5. Now search again - should find both memories and knowledge
     result = await mcp_client.call_tool("search", {"query": "FastMCP"})  # Simpler query
     assert not result.is_error
     

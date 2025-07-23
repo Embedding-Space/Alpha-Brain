@@ -1,7 +1,8 @@
 """Test the core memory workflow: remember something, then find it."""
 
-import pytest
 import asyncio
+
+import pytest
 
 
 @pytest.mark.asyncio

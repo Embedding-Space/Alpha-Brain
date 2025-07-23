@@ -2,6 +2,7 @@
 """Dynamic CLI that auto-generates commands from MCP server tools."""
 
 import asyncio
+import contextlib
 import json
 import sys
 from typing import Any
@@ -26,8 +27,7 @@ async def get_tools():
 async def call_tool(tool_name: str, arguments: dict[str, Any]):
     """Call a tool on the MCP server."""
     async with Client(MCP_URL) as client:
-        result = await client.call_tool(tool_name, arguments=arguments)
-        return result
+        return await client.call_tool(tool_name, arguments=arguments)
 
 
 def print_result(result):
@@ -93,7 +93,7 @@ def list_tools_command():
         table.add_row(name, description)
     
     console.print(table)
-    console.print(f"\nUse 'mcp help-tool TOOL_NAME' for detailed help on any tool.")
+    console.print("\nUse 'mcp help-tool TOOL_NAME' for detailed help on any tool.")
 
 
 def help_tool_command(tool_name: str):
@@ -135,7 +135,7 @@ def help_tool_command(tool_name: str):
             if description:
                 console.print(f"      {description}")
     
-    console.print(f"\n[bold]Example:[/bold]")
+    console.print("\n[bold]Example:[/bold]")
     console.print(f"  mcp {tool_name}", end="")
     
     # Show example with required args
@@ -211,23 +211,16 @@ def parse_tool_args(tool, args: list[str]) -> dict[str, Any]:
                 elif prop_type == "object":
                     # Try to parse as JSON object
                     value = json.loads(value)
-                else:
-                    # For anyOf types (e.g., str | None, int | None), try to infer
-                    if "anyOf" in prop_def:
-                        # Check if one of the types is integer or number
-                        types = [t.get("type") for t in prop_def["anyOf"] if "type" in t]
-                        if "integer" in types:
-                            try:
-                                value = int(value)
-                            except ValueError:
-                                # Not an integer, keep as string
-                                pass
-                        elif "number" in types:
-                            try:
-                                value = float(value)
-                            except ValueError:
-                                # Not a number, keep as string
-                                pass
+                # For anyOf types (e.g., str | None, int | None), try to infer
+                elif "anyOf" in prop_def:
+                    # Check if one of the types is integer or number
+                    types = [t.get("type") for t in prop_def["anyOf"] if "type" in t]
+                    if "integer" in types:
+                        with contextlib.suppress(ValueError):
+                            value = int(value)
+                    elif "number" in types:
+                        with contextlib.suppress(ValueError):
+                            value = float(value)
                 # string stays as is
             except (ValueError, json.JSONDecodeError):
                 console.print(f"[red]Error:[/red] Invalid value for '--{arg_name}' (expected {prop_type})")
