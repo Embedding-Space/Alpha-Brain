@@ -167,6 +167,38 @@ def tool_command(tool_name: str, args: list[str]):
         sys.exit(1)
 
 
+def convert_arg_value(value: str, prop_def: dict[str, Any]) -> Any:
+    """Convert a string argument value to the appropriate type based on schema."""
+    prop_type = prop_def.get("type", "string")
+    
+    # Define type converters
+    converters = {
+        "integer": int,
+        "number": float,
+        "boolean": lambda v: v.lower() in ["true", "yes", "1"],
+        "array": json.loads,
+        "object": json.loads,
+    }
+    
+    try:
+        # Handle standard types
+        if prop_type in converters:
+            return converters[prop_type](value)
+        
+        # Handle anyOf types (e.g., str | None, int | None)
+        if "anyOf" in prop_def:
+            types = [t.get("type") for t in prop_def["anyOf"] if "type" in t]
+            for type_name in ["integer", "number"]:
+                if type_name in types:
+                    with contextlib.suppress(ValueError):
+                        return converters[type_name](value)
+        
+        # Default: string stays as is
+        return value
+    except (ValueError, json.JSONDecodeError) as e:
+        raise ValueError(f"Invalid value (expected {prop_type})") from e
+
+
 def parse_tool_args(tool, args: list[str]) -> dict[str, Any]:
     """Parse command line arguments for a tool."""
     schema = tool.inputSchema
@@ -179,59 +211,33 @@ def parse_tool_args(tool, args: list[str]) -> dict[str, Any]:
     while i < len(args):
         arg = args[i]
         
-        if arg.startswith("--"):
-            # It's a named argument
-            arg_name = arg[2:]
-            
-            if arg_name not in properties:
-                console.print(f"[red]Error:[/red] Unknown argument '--{arg_name}'")
-                sys.exit(1)
-            
-            # Get the value
-            if i + 1 >= len(args):
-                console.print(f"[red]Error:[/red] Missing value for '--{arg_name}'")
-                sys.exit(1)
-            
-            value = args[i + 1]
-            
-            # Type conversion based on schema
-            prop_def = properties[arg_name]
-            prop_type = prop_def.get("type", "string")
-            
-            try:
-                if prop_type == "integer":
-                    value = int(value)
-                elif prop_type == "number":
-                    value = float(value)
-                elif prop_type == "boolean":
-                    value = value.lower() in ["true", "yes", "1"]
-                elif prop_type == "array":
-                    # Try to parse as JSON array
-                    value = json.loads(value)
-                elif prop_type == "object":
-                    # Try to parse as JSON object
-                    value = json.loads(value)
-                # For anyOf types (e.g., str | None, int | None), try to infer
-                elif "anyOf" in prop_def:
-                    # Check if one of the types is integer or number
-                    types = [t.get("type") for t in prop_def["anyOf"] if "type" in t]
-                    if "integer" in types:
-                        with contextlib.suppress(ValueError):
-                            value = int(value)
-                    elif "number" in types:
-                        with contextlib.suppress(ValueError):
-                            value = float(value)
-                # string stays as is
-            except (ValueError, json.JSONDecodeError):
-                console.print(f"[red]Error:[/red] Invalid value for '--{arg_name}' (expected {prop_type})")
-                sys.exit(1)
-            
-            parsed[arg_name] = value
-            i += 2
-        else:
+        if not arg.startswith("--"):
             console.print(f"[red]Error:[/red] Unexpected argument '{arg}'")
             console.print("All arguments must be in --name value format")
             sys.exit(1)
+        
+        # It's a named argument
+        arg_name = arg[2:]
+        
+        if arg_name not in properties:
+            console.print(f"[red]Error:[/red] Unknown argument '--{arg_name}'")
+            sys.exit(1)
+        
+        # Get the value
+        if i + 1 >= len(args):
+            console.print(f"[red]Error:[/red] Missing value for '--{arg_name}'")
+            sys.exit(1)
+        
+        value = args[i + 1]
+        
+        # Type conversion based on schema
+        try:
+            parsed[arg_name] = convert_arg_value(value, properties[arg_name])
+        except ValueError:
+            console.print(f"[red]Error:[/red] Invalid value for '--{arg_name}'")
+            sys.exit(1)
+        
+        i += 2
     
     # Check required arguments
     for req in required:

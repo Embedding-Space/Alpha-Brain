@@ -1,0 +1,47 @@
+Current time: {{ current_time | format_time_full }}
+
+{% if filters.entity or filters.text or filters.exact or filters.keyword or filters.importance -%}
+
+**Active Filters**:
+{%- if filters.entity %}
+- Entity: {{ filters.entity }}
+{%- endif %}
+{%- if filters.text %}
+- Text search: "{{ filters.text }}"
+{%- endif %}
+{%- if filters.exact %}
+- Exact match: "{{ filters.exact }}"
+{%- endif %}
+{%- if filters.keyword %}
+- Keyword: {{ filters.keyword }}
+{%- endif %}
+{%- if filters.importance %}
+- Minimum importance: {{ filters.importance }}
+{%- endif %}
+{%- endif %}
+
+{% if memories|length == 0 -%}
+No memories found for this time period{% if filters.entity or filters.text or filters.exact %} with the specified filters{% endif %}.
+{%- else -%}
+**{{ memories|length }} {{ 'memory' if memories|length == 1 else 'memories' }} found**{% if memories|length == limit %} (showing first {{ limit }}){% endif %}
+
+{% for memory in memories %}
+## {{ memory.id }}
+
+{{ memory.content }}
+
+**Time**: {{ memory.created_at|format_time }}
+{% if memory.marginalia and memory.marginalia.entities -%}
+**Entities**: {{ memory.marginalia.entities|join(', ') }}
+{% endif -%}
+{%- if memory.marginalia and memory.marginalia.importance -%}
+**Importance**: {{ memory.marginalia.importance }}/5
+{% endif -%}
+{%- if memory.marginalia and memory.marginalia.keywords -%}
+**Keywords**: {{ memory.marginalia.keywords|join(', ') }}
+{% endif -%}
+{%- if not loop.last %}
+
+{% endif -%}
+{%- endfor %}
+{%- endif %}

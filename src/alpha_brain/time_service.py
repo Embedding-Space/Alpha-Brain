@@ -308,25 +308,34 @@ class TimeService:
             except Exception:
                 pass  # Fall through to other formats
         
+        # Define unit mappings
+        abbrev_units = {
+            "s": lambda v: timedelta(seconds=v),
+            "m": lambda v: timedelta(minutes=v),
+            "h": lambda v: timedelta(hours=v),
+            "d": lambda v: timedelta(days=v),
+            "w": lambda v: timedelta(weeks=v),
+            "y": lambda v: timedelta(days=v * 365),  # Approximate
+        }
+        
+        natural_units = {
+            "second": lambda v: timedelta(seconds=v),
+            "minute": lambda v: timedelta(minutes=v),
+            "hour": lambda v: timedelta(hours=v),
+            "day": lambda v: timedelta(days=v),
+            "week": lambda v: timedelta(weeks=v),
+            "month": lambda v: timedelta(days=v * 30),  # Approximate
+            "year": lambda v: timedelta(days=v * 365),  # Approximate
+        }
+        
         # Try abbreviated formats (3h, 1d, etc.)
         abbrev_pattern = r"^(\d+(?:\.\d+)?)\s*([hdwmsy])$"
         match = re.match(abbrev_pattern, duration_str.lower().strip())
         if match:
             value = float(match.group(1))
             unit = match.group(2)
-            
-            if unit == "s":
-                return timedelta(seconds=value)
-            if unit == "m":
-                return timedelta(minutes=value)
-            if unit == "h":
-                return timedelta(hours=value)
-            if unit == "d":
-                return timedelta(days=value)
-            if unit == "w":
-                return timedelta(weeks=value)
-            if unit == "y":
-                return timedelta(days=value * 365)  # Approximate
+            if unit in abbrev_units:
+                return abbrev_units[unit](value)
         
         # Try natural language formats (3 hours, 1 day, etc.)
         natural_pattern = r"^(\d+(?:\.\d+)?)\s+(second|minute|hour|day|week|month|year)s?$"
@@ -334,21 +343,8 @@ class TimeService:
         if match:
             value = float(match.group(1))
             unit = match.group(2)
-            
-            if unit == "second":
-                return timedelta(seconds=value)
-            if unit == "minute":
-                return timedelta(minutes=value)
-            if unit == "hour":
-                return timedelta(hours=value)
-            if unit == "day":
-                return timedelta(days=value)
-            if unit == "week":
-                return timedelta(weeks=value)
-            if unit == "month":
-                return timedelta(days=value * 30)  # Approximate
-            if unit == "year":
-                return timedelta(days=value * 365)  # Approximate
+            if unit in natural_units:
+                return natural_units[unit](value)
         
         # If all else fails, try dateparser with "in X" format
         try:

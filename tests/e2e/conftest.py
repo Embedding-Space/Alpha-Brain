@@ -21,7 +21,7 @@ def reset_test_database():
     
     # Drop and recreate database (must be separate commands to avoid transaction block)
     # First terminate any active connections to the test database
-    result = subprocess.run(
+    subprocess.run(
         [
             "docker",
             "exec",
@@ -45,7 +45,7 @@ def reset_test_database():
     )
     
     # Then drop the database
-    result = subprocess.run(
+    subprocess.run(
         [
             "docker",
             "exec",

@@ -2,6 +2,7 @@
 
 from .add_alias import add_alias
 from .add_identity_fact import add_identity_fact
+from .browse import browse
 from .create_knowledge import create_knowledge
 from .find_clusters import find_clusters
 from .get_cluster import get_cluster
@@ -19,6 +20,7 @@ from .whoami import whoami
 __all__ = [
     "add_alias",
     "add_identity_fact",
+    "browse",
     "create_knowledge",
     "find_clusters",
     "get_cluster",
