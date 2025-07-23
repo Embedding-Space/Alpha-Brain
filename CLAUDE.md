@@ -72,6 +72,8 @@ uv run alpha-brain help-tool remember   # Get help for a specific tool
 uv run alpha-brain whoami               # Get current context and identity
 uv run alpha-brain remember --content "Hello world"  # Call any MCP tool
 uv run alpha-brain search --query "alpha brain" --limit 5
+uv run alpha-brain browse --interval today  # Browse today's memories
+uv run alpha-brain browse --interval "past week" --entity "Jeffery Harrell"  # Browse with filters
 
 # Code quality
 just lint        # Check code style with Ruff
@@ -144,6 +146,17 @@ just clean-cache # Clean Python cache files
 - **One-time service initialization**: Database and embedding services persist across MCP connections
 - **Jinja2 Templates**: User-editable output formatting with temporal grounding
 - **Splash Engine**: Asymmetric similarity search for memory resonance (our killer feature)
+- **Unified Search**: Already implemented! Single search across entities, knowledge, and memories
+
+### Search Architecture (Multi-Wall Approach)
+
+The search tool implements a sophisticated unified search with 4 walls:
+1. **Entity Wall**: Matches canonical names and aliases
+2. **Knowledge Wall**: Searches knowledge titles (exact) then full-text
+3. **Full-text Memory Wall**: PostgreSQL text search on memories
+4. **Semantic/Emotional Wall**: Vector similarity search with adaptive strategy
+
+Results are deduplicated across all categories, providing truly unified search.
 
 ### Test Infrastructure (Dogfooding)
 - **Test data uses production backup/restore**: Same pgvector-aware mechanism as production
@@ -175,9 +188,9 @@ just clean-cache # Clean Python cache files
 - **Identity facts**: Timeline with temporal precision (era/year/month/day/datetime)
 - **Personality directives**: Mutable behavioral instructions with weights and categories
 - **Memory clustering**: Find patterns in memories using HDBSCAN, DBSCAN, agglomerative, or k-means
+- **Browse tool**: Chronological memory viewing with interval-based browsing and multiple filter options
 
 ### What's Next (TODOs)
-- Build unified search across memories and knowledge
 - Add "crystallize" function to extract knowledge from memories
 - Entity merge functionality (combine misspelled/duplicate entities)
 - Import canonical entities from JSON file via MCP tool
@@ -534,6 +547,14 @@ memories = await service.search(
 )
 ```
 
+### Browse Pattern
+```python
+# Browse chronologically without search
+await mcp_client.call_tool("browse", {"interval": "today"})
+await mcp_client.call_tool("browse", {"interval": "past week", "entity": "Jeffery Harrell"})
+await mcp_client.call_tool("browse", {"interval": "yesterday", "text": "debugging"})
+```
+
 ### Testing Philosophy
 - **E2E tests only**: No unit or integration tests - our code is primarily glue between services
 - Tests simulate real user workflows through MCP tools, not individual functions
@@ -591,6 +612,19 @@ Pendulum doesn't parse ISO durations directly. We have a custom parser in `inter
 - "database is being accessed by other users" - Terminate connections first with pg_terminate_backend
 - Use the patterns in `tests/e2e/conftest.py` for proper database reset
 
+## Quick Tool Reference
+
+### Most Used Tools
+- `whoami`: Get current context and identity
+- `remember --content "..."`: Store a memory
+- `search --query "..." [--interval "..."]`: Search everything (entities, knowledge, memories)
+- `browse --interval "..." [--entity "..."] [--text "..."]`: Chronological view
+- `create_knowledge --slug "..." --content "..."`: Create wiki entry
+- `get_knowledge --slug "..."`: Retrieve knowledge document
+- `list_knowledge`: List all knowledge documents
+- `add_alias --canonical_name "..." --alias "..."`: Add entity alias
+- `find_clusters --query "..."`: Find memory clusters
+
 ## Environment Variables
 
 Required:
@@ -614,14 +648,16 @@ Use `just dev` for the tight loop: restart + watch logs.
 
 ### Output Template Development
 1. Edit templates in `src/alpha_brain/templates/outputs/`
-2. Templates use Jinja2 syntax with custom filters:
-   - `format_time`: Full context with age
-   - `format_time_readable`: Human-readable datetime
-   - `format_time_age`: Relative time (e.g., "5 minutes ago")
-   - `format_time_full`: Complete datetime for AI temporal grounding
-   - `pluralize`: Simple pluralization
+2. Templates use Jinja2 syntax with custom filters
 3. Context always includes `current_time` for temporal grounding
 4. Use `{% ... %}` to preserve whitespace, avoid `{%- ... %}` unless you want to strip it
+
+### Template Filters Reference
+- `format_time`: Full timestamp with relative age (e.g., "Jan 23 at 9:15 AM (5 minutes ago)")
+- `format_time_readable`: Human-readable datetime (e.g., "Jan 23 at 9:15 AM")
+- `format_time_age`: Relative time only (e.g., "5 minutes ago")
+- `format_time_full`: Complete datetime for AI temporal grounding (e.g., "Thursday, January 23, 2025 at 9:15 AM CST")
+- `pluralize`: Simple pluralization (e.g., "1 memory" vs "2 memories")
 
 ## TDD Manifesto (Test-Driven Development)
 
