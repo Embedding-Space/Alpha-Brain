@@ -1,0 +1,22 @@
+## Entity Details: {{ name }}
+
+{% if found %}
+**Canonical Name**: {{ canonical }}
+
+{% if is_canonical %}
+This is the canonical name.
+{% else %}
+This name maps to: **{{ canonical }}**
+{% endif %}
+
+{% if aliases %}
+**Other aliases** ({{ aliases|length }}):
+{% for alias in aliases %}
+- {{ alias }}
+{% endfor %}
+{% else %}
+No other aliases found.
+{% endif %}
+{% else %}
+{{ message }}
+{% endif %}

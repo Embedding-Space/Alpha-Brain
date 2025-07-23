@@ -2,13 +2,14 @@
 
 import numpy as np
 from fastmcp import Context
+from pydantic import Field
 from scipy.spatial.distance import cosine
 from sqlalchemy import select, text
 
 from alpha_brain.database import get_db
 from alpha_brain.embeddings import get_embedding_service
 from alpha_brain.memory_service import get_memory_service
-from alpha_brain.schema import Entity, Knowledge, Memory, MemoryOutput
+from alpha_brain.schema import Knowledge, Memory, MemoryOutput, NameIndex
 from alpha_brain.templates import render_output
 from alpha_brain.time_service import TimeService
 
@@ -54,7 +55,13 @@ PURE_NEUTRAL = np.array([0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0])
 EMOTIONAL_THRESHOLD = 0.8  # If neutral similarity < 0.8, include emotional search
 
 
-async def search(ctx: Context, query: str | None = None, limit: int = 10, interval: str | None = None) -> str:
+async def search(
+    ctx: Context, 
+    query: str | None = None, 
+    limit: int = 10, 
+    interval: str | None = None, 
+    entity: str | None = Field(None, description="Filter results by entity name")
+) -> str:
     """
     Adaptive search that analyzes query emotion and chooses appropriate strategy.
     
@@ -67,6 +74,7 @@ async def search(ctx: Context, query: str | None = None, limit: int = 10, interv
         query: The search query (optional for browse mode)
         limit: Maximum number of results per search type
         interval: Time interval to filter by (e.g., "yesterday", "past 3 hours")
+        entity: Filter results by entity name (uses name index for canonicalization)
         
     Returns:
         Formatted search results with appropriate sections
@@ -121,35 +129,93 @@ async def search(ctx: Context, query: str | None = None, limit: int = 10, interv
         except Exception as e:
             return f"Browse mode error: {e!s}"
     
-    # Require query for all other modes
-    if not query:
-        raise ValueError("Query parameter is required unless using browse mode with interval")
+    # Require query for all other modes, unless we have entity filtering
+    if (not query or query.strip() == "") and not entity:
+        raise ValueError("Query parameter is required unless using browse mode with interval or entity filtering")
+
+    # Handle entity-only search (no query, just entity filtering)
+    if (not query or query.strip() == "") and entity:
+        # Get entity info for display
+        entity_match = None
+        async with get_db() as session:
+            # Check if entity matches any name in the index
+            stmt = select(NameIndex).where(NameIndex.name == entity)
+            result = await session.execute(stmt)
+            name_entry = result.scalar_one_or_none()
+            
+            if name_entry:
+                # Found a match - get all aliases for this canonical name
+                canonical_name = name_entry.canonical_name
+                
+                # Get all names that point to this canonical
+                stmt = select(NameIndex).where(NameIndex.canonical_name == canonical_name)
+                result = await session.execute(stmt)
+                all_entries = result.scalars().all()
+                
+                # Extract all the names (aliases)
+                aliases = [entry.name for entry in all_entries if entry.name != canonical_name]
+                
+                entity_match = {
+                    "canonical_name": canonical_name,
+                    "aliases": aliases,
+                    "entity_type": None,  # We don't store entity types in name index
+                    "description": None   # We don't store descriptions in name index
+                }
+        
+        memory_service = get_memory_service()
+        semantic_memories = await memory_service.search(
+            query=None,
+            search_type="semantic", 
+            limit=limit,
+            interval=interval,
+            entity=entity
+        )
+        
+        return render_output(
+            "search",
+            query=f"Entity: {entity}",
+            entity=entity_match,
+            knowledge_title_match=None,
+            knowledge_fulltext_matches=[],
+            fulltext_memories=[],
+            semantic_memories=semantic_memories,
+            emotional_memories=[],
+            semantic_warning=None,
+            emotional_warning=None,
+            search_mode="entity_only",
+            neutral_similarity=None,
+            dominant_emotion=None,
+            dominant_score=None,
+            current_time=TimeService.format_full(TimeService.now())
+        )
 
     # Wall 1: Check for entity matches (only if we have a query)
     entity_match = None
     
-    # Try exact match first (canonical name or alias)
+    # Try exact match using name index (canonical name or alias)
     async with get_db() as session:
-        # Check canonical name
-        stmt = select(Entity).where(Entity.canonical_name == query)
+        # Check if query matches any name in the index
+        stmt = select(NameIndex).where(NameIndex.name == query)
         result = await session.execute(stmt)
-        entity = result.scalar_one_or_none()
+        name_entry = result.scalar_one_or_none()
         
-        if not entity:
-            # Check aliases using PostgreSQL ANY
-            stmt = select(Entity).where(
-                text(":query = ANY(aliases)").bindparams(query=query)
-            )
+        if name_entry:
+            # Found a match - get all aliases for this canonical name
+            canonical_name = name_entry.canonical_name
+            
+            # Get all names that point to this canonical
+            stmt = select(NameIndex).where(NameIndex.canonical_name == canonical_name)
             result = await session.execute(stmt)
-            entity = result.scalar_one_or_none()
-        
-        if entity:
+            all_entries = result.scalars().all()
+            
+            # Extract all the names (aliases)
+            aliases = [entry.name for entry in all_entries if entry.name != canonical_name]
+            
             entity_match = {
-                "id": entity.id,
-                "canonical_name": entity.canonical_name,
-                "aliases": entity.aliases,
-                "entity_type": entity.entity_type,
-                "description": entity.description,
+                "canonical_name": canonical_name,
+                "aliases": aliases,
+                "entity_type": None,  # We don't store entity types in name index
+                "description": None   # We don't store descriptions in name index
             }
     
     # Wall 2: Check for knowledge matches (title first, then full-text)
@@ -267,7 +333,8 @@ async def search(ctx: Context, query: str | None = None, limit: int = 10, interv
             query=query,
             search_type="semantic",
             limit=limit,
-            interval=interval
+            interval=interval,
+            entity=entity
         )
         emotional_memories = []
         search_mode = "semantic"
@@ -277,13 +344,15 @@ async def search(ctx: Context, query: str | None = None, limit: int = 10, interv
             query=query,
             search_type="semantic",
             limit=limit,
-            interval=interval
+            interval=interval,
+            entity=entity
         )
         emotional_memories = await memory_service.search(
             query=query,
             search_type="emotional",
             limit=limit,
-            interval=interval
+            interval=interval,
+            entity=entity
         )
         search_mode = "both"
     

@@ -17,6 +17,8 @@ WORKDIR /app
 # Copy everything we need
 COPY pyproject.toml uv.lock README.md ./
 COPY src ./src
+COPY alembic.ini ./
+COPY alembic ./alembic
 
 # Install in editable mode so bind mounts work properly
 RUN uv pip install --system --no-cache -e .

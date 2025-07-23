@@ -24,6 +24,7 @@ async def test_expected_tools_available(mcp_client):
     # Core memory tools
     assert "remember" in tool_names
     assert "search" in tool_names
+    assert "browse" in tool_names
     assert "get_memory" in tool_names
     
     # Knowledge tools
@@ -33,7 +34,7 @@ async def test_expected_tools_available(mcp_client):
     assert "list_knowledge" in tool_names
     
     # Entity tools
-    assert "add_alias" in tool_names
+    assert "entity" in tool_names
     
     # Clustering tools
     assert "find_clusters" in tool_names

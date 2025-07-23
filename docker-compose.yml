@@ -43,6 +43,30 @@ services:
       retries: 10
     restart: unless-stopped
 
+  # Run database migrations before starting the main service
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: alpha-brain-migrate
+    entrypoint: []  # Override the default FastMCP entrypoint
+    command: ["uv", "run", "alembic", "upgrade", "head"]
+    environment:
+      <<: *shared-env
+      DATABASE_URL: postgresql://alpha:brain@postgres:5432/alpha_brain
+      OPENAI_BASE_URL: http://host.docker.internal:11434/v1
+      OPENAI_API_KEY: not-needed
+      EMBEDDING_SERVICE_URL: http://embedding-service:8001
+    networks:
+      - alpha-brain-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./alembic:/app/alembic
+      - ./alembic.ini:/app/alembic.ini:ro
+    restart: "no"  # Run once and exit
+
   alpha-brain-mcp:
     build:
       context: .
@@ -59,6 +83,8 @@ services:
     networks:
       - alpha-brain-network
     depends_on:
+      migrate:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       embedding-service:
@@ -97,6 +123,31 @@ services:
       timeout: 5s
       retries: 5
 
+  # Run test migrations
+  test-migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: alpha-brain-test-migrate
+    profiles: ["test"]
+    entrypoint: []  # Override the default FastMCP entrypoint
+    command: ["uv", "run", "alembic", "upgrade", "head"]
+    environment:
+      <<: *shared-env
+      DATABASE_URL: postgresql://alpha:brain@test-postgres:5432/alpha_brain_test
+      OPENAI_BASE_URL: http://host.docker.internal:11434/v1
+      OPENAI_API_KEY: not-needed
+      EMBEDDING_SERVICE_URL: http://embedding-service:8001
+    networks:
+      - alpha-brain-network
+    depends_on:
+      test-postgres:
+        condition: service_healthy
+    volumes:
+      - ./alembic:/app/alembic
+      - ./alembic.ini:/app/alembic.ini:ro
+    restart: "no"
+
   test-mcp:
     build:
       context: .
@@ -115,6 +166,8 @@ services:
     networks:
       - alpha-brain-network
     depends_on:
+      test-migrate:
+        condition: service_completed_successfully
       test-postgres:
         condition: service_healthy
       embedding-service:

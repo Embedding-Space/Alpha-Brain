@@ -155,42 +155,19 @@ class KnowledgeOutput(BaseModel):
     updated_at: datetime
 
 
-class Entity(Base):
-    """Canonical entity names with their aliases for normalization."""
 
-    __tablename__ = "entities"
-
-    # Primary key - integer for efficient foreign keys
+class NameIndex(Base):
+    """Simple name to canonical name mapping."""
+    
+    __tablename__ = "name_index"
+    
     id = Column(Integer, primary_key=True)
+    name = Column(String, nullable=False, unique=True, index=True)
+    canonical_name = Column(String, nullable=False, index=True)
     
-    # Canonical name - unique and meaningful
-    canonical_name = Column(String, nullable=False, unique=True, index=True)
-
-    # Array of aliases that resolve to this canonical name
-    aliases = Column(ARRAY(String), nullable=False, default=[])
-    
-    # Entity metadata
-    entity_type = Column(String)  # 'person', 'place', 'project', 'company', 'cat', etc.
-    description = Column(Text)  # Brief description for whois tool
-
-
-class EntityInput(BaseModel):
-    """Input model for creating/updating entities."""
-
-    canonical: str = Field(..., description="The canonical name")
-    aliases: list[str] = Field(
-        default_factory=list,
-        description="List of aliases that map to this canonical name",
-    )
-    entity_type: str | None = Field(None, description="Entity type (person, place, etc.)")
-    description: str | None = Field(None, description="Brief description for whois")
-
-
-class EntityBatch(BaseModel):
-    """Batch of entities for import."""
-
-    version: str = Field(..., description="Schema version")
-    entities: list[EntityInput] = Field(..., description="List of entities to import")
+    # Metadata
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+    updated_at = Column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
 
 
 class Context(Base):

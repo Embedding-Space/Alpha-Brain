@@ -16,16 +16,24 @@ from structlog import get_logger
 
 from alpha_brain.database import get_db
 from alpha_brain.embeddings import get_embedding_service
-from alpha_brain.entity_service import get_entity_service
 from alpha_brain.interval_parser import parse_interval
 from alpha_brain.memory_helper import MemoryHelper
-from alpha_brain.schema import Memory, MemoryOutput
+from alpha_brain.schema import Memory, MemoryOutput, NameIndex
 from alpha_brain.splash_engine import get_splash_engine
 from alpha_brain.time_service import TimeService
 
 logger = get_logger()
 
 ClusterAlgorithm = Literal["hdbscan", "dbscan", "agglomerative", "kmeans"]
+
+
+async def canonicalize_entity_name(name: str) -> str:
+    """Canonicalize an entity name using the name index."""
+    async with get_db() as session:
+        stmt = select(NameIndex.canonical_name).where(NameIndex.name == name)
+        result = await session.execute(stmt)
+        canonical = result.scalar_one_or_none()
+        return canonical or name  # Return original if not found
 
 
 class ClusterCandidate:
@@ -168,17 +176,22 @@ class MemoryService:
             logger.info("Analyzing memory")
             metadata = await self.memory_helper.analyze_memory(content)
             
-            # Get entity IDs for the canonical entities
-            entity_service = get_entity_service()
-            entity_result = await entity_service.canonicalize_names_with_ids(
-                metadata.entities + metadata.unknown_entities
-            )
+            # Canonicalize all entity names using name index
+            all_entity_names = metadata.entities + metadata.unknown_entities
+            canonical_entities = []
+            unknown_entities = []
+            
+            for name in all_entity_names:
+                canonical = await canonicalize_entity_name(name)
+                if canonical != name:  # Found canonical mapping
+                    canonical_entities.append(canonical)
+                else:  # No mapping found, keep as unknown
+                    unknown_entities.append(name)
 
             # Convert to dict for storage
             metadata_dict = {
-                "entities": metadata.entities,
-                "unknown_entities": metadata.unknown_entities,
-                "entity_ids": entity_result["entity_ids"],  # Add entity IDs
+                "entities": canonical_entities,  # Store canonical names
+                "unknown_entities": unknown_entities,  # Store unresolved names
                 "importance": metadata.importance,
                 "keywords": metadata.keywords,
                 "summary": metadata.summary,
@@ -187,9 +200,8 @@ class MemoryService:
 
             logger.info(
                 "Memory analyzed",
-                entity_count=len(metadata.entities),
-                unknown_count=len(metadata.unknown_entities),
-                entity_ids=entity_result["entity_ids"],
+                canonical_count=len(canonical_entities),
+                unknown_count=len(unknown_entities),
                 importance=metadata.importance,
             )
             return metadata_dict
@@ -197,10 +209,11 @@ class MemoryService:
             logger.warning("Memory analysis failed", error=str(e))
             # Return minimal metadata
             return {
+                "entities": [],
+                "unknown_entities": [],
                 "summary": content[:100] + "..." if len(content) > 100 else content,
                 "importance": 3,
                 "analyzed_at": pendulum.now("UTC").isoformat(),
-                "entity_ids": [],  # Empty entity IDs on failure
             }
 
     async def remember(
@@ -224,6 +237,22 @@ class MemoryService:
             # Then analyze the memory (optional, can fail gracefully)
             metadata = await self._analyze_memory_safe(content)
 
+            # Canonicalize entity names if any were extracted
+            if metadata.get("unknown_entities"):
+                canonical_entities = []
+                for name in metadata["unknown_entities"]:
+                    canonical = await canonicalize_entity_name(name)
+                    if canonical not in canonical_entities:
+                        canonical_entities.append(canonical)
+                
+                # Update metadata with canonical entities
+                metadata["entities"] = canonical_entities
+                logger.info(
+                    "Canonicalized entities",
+                    unknown=metadata["unknown_entities"],
+                    canonical=canonical_entities
+                )
+
             # Merge provided marginalia with our metadata
             combined_marginalia = {**(marginalia or {}), **metadata}
 
@@ -234,8 +263,7 @@ class MemoryService:
                     created_at=pendulum.now("UTC"),
                     semantic_embedding=semantic_emb.tolist(),
                     emotional_embedding=emotional_emb.tolist(),
-                    marginalia=combined_marginalia,
-                    entity_ids=metadata.get("entity_ids", []),  # Store entity IDs
+                    marginalia=combined_marginalia
                 )
 
                 session.add(memory)
@@ -325,13 +353,7 @@ class MemoryService:
                 # Canonicalize entity filter if provided
                 canonical_entity = None
                 if entity:
-                    entity_service = get_entity_service()
-                    result = await entity_service.canonicalize_names([entity])
-                    if result["entities"]:
-                        canonical_entity = result["entities"][0]
-                    else:
-                        # Entity not found, use as-is
-                        canonical_entity = entity
+                    canonical_entity = await canonicalize_entity_name(entity)
                     logger.info(
                         "Canonicalized entity",
                         input=entity,
@@ -416,9 +438,7 @@ class MemoryService:
                 entity_matches = []
                 if search_type != "exact" and query:
                     # Try to canonicalize the query - it might be an entity alias
-                    entity_service = get_entity_service()
-                    result = await entity_service.canonicalize_names([query])
-                    search_entity = result["entities"][0] if result["entities"] else query
+                    search_entity = await canonicalize_entity_name(query)
                     
                     logger.info(
                         "Entity search canonicalization",

@@ -33,9 +33,10 @@ async def test_remember_with_entity_then_search(mcp_client):
     """Can we find memories by entity name?"""
     # First, establish an entity with an alias
     # Note: Sparkle is the canonical name, not Sparkplug Louise Mittenhaver
-    await mcp_client.call_tool("add_alias", {
-        "canonical_name": "Sparkle",
-        "alias": "Sparkle the cat"
+    await mcp_client.call_tool("entity", {
+        "operation": "set-alias",
+        "name": "Sparkle the cat",
+        "canonical": "Sparkle"
     })
     
     # Remember something about Sparkle
@@ -90,7 +91,8 @@ async def test_search_with_time_interval(mcp_client):
     
     response_text = result.content[0].text
     # Our unique test memory should NOT be in yesterday's results
-    assert unique_id not in response_text  # More specific check
+    # Check for "No results found" instead of unique_id absence since the query echoes the ID
+    assert ("No results found" in response_text or "0 memories found" in response_text or test_memory not in response_text)
 
 
 @pytest.mark.asyncio

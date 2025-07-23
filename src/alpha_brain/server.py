@@ -6,10 +6,10 @@ from fastmcp import FastMCP
 from structlog import get_logger
 
 from alpha_brain.tools import (
-    add_alias,
     add_identity_fact,
     browse,
     create_knowledge,
+    entity,
     find_clusters,
     get_cluster,
     get_knowledge,
@@ -115,6 +115,7 @@ mcp.tool(health_check)
 mcp.tool(remember)
 mcp.tool(search)
 mcp.tool(browse)
+mcp.tool(entity)
 mcp.tool(find_clusters)
 mcp.tool(get_cluster)
 mcp.tool(get_memory)
@@ -122,7 +123,6 @@ mcp.tool(create_knowledge)
 mcp.tool(get_knowledge)
 mcp.tool(update_knowledge)
 mcp.tool(list_knowledge)
-mcp.tool(add_alias)
 mcp.tool(set_context)
 mcp.tool(add_identity_fact)
 mcp.tool(set_personality)

@@ -5,10 +5,9 @@ from sqlalchemy import func, select, text
 from structlog import get_logger
 
 from alpha_brain.database import get_db
-from alpha_brain.entity_service import get_entity_service
 from alpha_brain.interval_parser import parse_interval
 from alpha_brain.memory_service import get_memory_service
-from alpha_brain.schema import Entity, Memory
+from alpha_brain.schema import Memory
 from alpha_brain.templates import render_output
 from alpha_brain.time_service import TimeService
 
@@ -113,29 +112,11 @@ async def find_clusters(
         
         filtered_count = len(memories)
         
-        # Step 2: Apply entity filter if specified
+        # Step 2: Apply entity filter if specified  
         if entities:
-            # Get entity IDs for all specified entities
-            entity_service = get_entity_service()
-            required_entity_ids = set()
-            
-            for entity_name in entities:
-                canonical_name = await entity_service.get_canonical_name(entity_name)
-                if canonical_name:
-                    # Get the entity to find its ID
-                    stmt = select(Entity).where(Entity.canonical_name == canonical_name)
-                    entity = await session.scalar(stmt)
-                    if entity:
-                        required_entity_ids.add(entity.id)
-            
-            # Filter memories that contain ALL required entities
-            if required_entity_ids:
-                memories = [
-                    m for m in memories 
-                    if m.entity_ids and required_entity_ids.issubset(set(m.entity_ids))
-                ]
-                logger.info(f"Entity filtering: {filtered_count} → {len(memories)} memories")
-                filtered_count = len(memories)
+            # TODO: Update entity filtering to use name_index system
+            # For now, skip entity filtering until updated
+            logger.warning("Entity filtering not yet updated for new name_index system", entities=entities)
     
     # Step 3: Run clustering analysis on filtered memory set
     memory_service = get_memory_service()
@@ -195,13 +176,9 @@ async def find_clusters(
             if memory.entity_ids:
                 all_entity_ids.update(memory.entity_ids)
         
+        # TODO: Update entity name resolution to use name_index system
+        # For now, skip entity name resolution until updated
         entity_names = []
-        if all_entity_ids:
-            async with get_db() as session:
-                stmt = select(Entity).where(Entity.id.in_(list(all_entity_ids)))
-                result = await session.execute(stmt)
-                entities_found = result.scalars().all()
-                entity_names = sorted([e.canonical_name for e in entities_found])
         
         candidate_dict = {
             "cluster_id": candidate.cluster_id,

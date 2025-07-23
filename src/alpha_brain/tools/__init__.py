@@ -1,9 +1,9 @@
 """Alpha Brain MCP Tools."""
 
-from .add_alias import add_alias
 from .add_identity_fact import add_identity_fact
 from .browse import browse
 from .create_knowledge import create_knowledge
+from .entity import entity
 from .find_clusters import find_clusters
 from .get_cluster import get_cluster
 from .get_knowledge import get_knowledge
@@ -18,10 +18,10 @@ from .update_knowledge import update_knowledge
 from .whoami import whoami
 
 __all__ = [
-    "add_alias",
     "add_identity_fact",
     "browse",
     "create_knowledge",
+    "entity",
     "find_clusters",
     "get_cluster",
     "get_knowledge",

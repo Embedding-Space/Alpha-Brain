@@ -9,7 +9,6 @@ from pydantic_ai.models.openai import OpenAIModel
 from pydantic_ai.settings import ModelSettings
 from structlog import get_logger
 
-from alpha_brain.entity_service import get_entity_service
 from alpha_brain.prompts import render_prompt
 from alpha_brain.settings import get_settings
 
@@ -43,10 +42,9 @@ class MemoryMetadata(BaseModel):
 class MemoryHelper:
     """Helper model for analyzing memories using sequential questions."""
 
-    def __init__(self, entity_service=None):
+    def __init__(self):
         """Initialize with Ollama-compatible endpoint from settings."""
         settings = get_settings()
-        self.entity_service = entity_service or get_entity_service()
 
         # Set environment variables for pydantic-ai OpenAI model
         if settings.openai_base_url:
@@ -171,19 +169,15 @@ class MemoryHelper:
             )
 
             if extracted_names:
-                canonicalization_result = await self.entity_service.canonicalize_names(
-                    extracted_names
-                )
-                metadata.entities = canonicalization_result["entities"]
-                metadata.unknown_entities = canonicalization_result["unknown_entities"]
+                # Store all extracted names as unknown_entities
+                # Canonicalization now happens in memory_service
+                metadata.entities = []
+                metadata.unknown_entities = extracted_names
 
                 logger.info(
-                    "Canonicalization complete",
+                    "Entity extraction complete",
                     extracted=len(extracted_names),
-                    canonical=len(metadata.entities),
-                    unknown_count=len(metadata.unknown_entities),
-                    entities=metadata.entities,
-                    unknown_entities=metadata.unknown_entities,
+                    entities=extracted_names,
                 )
 
             elapsed = time.time() - start_time

@@ -25,12 +25,13 @@ Alpha Brain embraces the principle that **models write JSON and read prose**:
 
 ### Entity Canonicalization
 
-The system maintains canonical entity names with aliases for consistent resolution:
+The system maintains canonical entity names through a simple name index:
 
-- **PostgreSQL arrays with GIN indexing** for efficient alias lookups
-- **Helper** (configurable local LLM, defaults to gemma3:4b) extracts entity names from prose and canonicalizes them
-- **Marginalia** field stores Helper's analysis including entities, keywords, and summaries
-- Example: "Jeff" → "Jeffery Harrell", "Sparkplug Louise Mittenhaver" → "Sparkle"
+- **Name Index table** maps names to canonical names (replaced complex Entity ORM system)
+- **Helper** (configurable local LLM, defaults to gemma3:4b) extracts entity names from prose
+- **Memory Service** canonicalizes extracted names during storage using the name index
+- **Entity Tool** manages name mappings with set-alias, merge, list, and show operations
+- Example: "Jeff" → "Jeffery Harrell", "Sparkle" → "Sparkplug Louise Mittenhaver"
 
 ### Identity & Context Management
 
@@ -99,12 +100,13 @@ just clean-cache # Clean Python cache files
 - **No cruft allowed** - remove old fields, patterns, and code without hesitation
 - **Data can be dropped** - we can wipe the volume and start fresh anytime
 - **Clean over compatible** - prefer clean design over maintaining old interfaces
-- Example: We removed the `entities` field in favor of rich `marginalia` - no compatibility layer needed
+- Example: We replaced the entire Entity ORM system with simple name_index table - no migration path needed
 
 ### Docker-First Development
 - Everything runs in Docker Compose
 - Single exposed port (9100) for MCP HTTP server
 - Bind mounts for source code = instant reload with `just restart`
+- Alembic migrations run automatically before server starts
 - This avoids the "working on server while talking to server" pain
 
 ### Package Structure
@@ -122,11 +124,12 @@ just clean-cache # Clean Python cache files
 
 ### Memory Pipeline
 1. Prose input → Dual embeddings (semantic + emotional)
-2. Entity extraction and canonicalization via Helper (local LLM)
-3. Store in Postgres with pgvector, including marginalia metadata
-4. Search returns memories with similarity scores and human-readable age
-5. Splash Engine provides associative memory resonance for serendipitous discovery
-6. Output templates format results with temporal grounding for AI models
+2. Entity extraction via Helper (local LLM) - names stored in marginalia
+3. Memory Service canonicalizes entity names using name index during storage
+4. Store in Postgres with pgvector, including marginalia metadata
+5. Search returns memories with similarity scores and human-readable age
+6. Splash Engine provides associative memory resonance for serendipitous discovery
+7. Output templates format results with temporal grounding for AI models
 
 ### Knowledge Pipeline
 1. Write knowledge naturally in Markdown
@@ -138,6 +141,7 @@ just clean-cache # Clean Python cache files
 ### Key Technical Choices
 - **FastMCP 2**: HTTP transport (not stdio) to avoid model instance proliferation
 - **Postgres + pgvector**: Vector similarity search with cosine distance
+- **Alembic**: Database migrations with proper pgvector support
 - **Sentence-transformers**: 
   - Semantic: all-mpnet-base-v2 (768D) - better quality than MiniLM
   - Emotional: j-hartmann/emotion-english-roberta-large (7D categorical - non-orthogonal basis)
@@ -192,11 +196,11 @@ Results are deduplicated across all categories, providing truly unified search.
 
 ### What's Next (TODOs)
 - Add "crystallize" function to extract knowledge from memories
-- Entity merge functionality (combine misspelled/duplicate entities)
 - Import canonical entities from JSON file via MCP tool
 - Add pagination support (offset parameter) for large result sets
 - Create OOBE (out-of-box experience) tests for fresh install
 - Implement user_name configuration (currently hard-coded as "Jeffery Harrell")
+- Update find_clusters entity filtering to use name_index system
 
 ## API Reference
 
@@ -295,37 +299,33 @@ success = await service.delete_knowledge(slug: str) -> bool
 - `KnowledgeOutput`: Formatted output with sections and metadata
 - `KnowledgeListItem`: Summary info for listing
 
-#### EntityService (`entity_service.py`)
-Singleton service for canonical entity management.
+#### Entity Management (via `entity` tool)
+Entity canonicalization is now handled through the name index and the entity tool.
 
 ```python
-# Get the singleton
-from alpha_brain.entity_service import get_entity_service
-service = get_entity_service()
+# Canonicalize a name using the name index
+from alpha_brain.memory_service import canonicalize_entity_name
+canonical = await canonicalize_entity_name("Jeff")  # Returns "Jeffery Harrell"
 
-# Get or create entity
-entity = await service.get_or_create_entity(
-    name: str,
-    aliases: list[str] | None = None
-) -> Entity
+# Use the entity tool via MCP
+await mcp_client.call_tool("entity", {
+    "operation": "set-alias",
+    "name": "Jeff",
+    "canonical": "Jeffery Harrell"
+})
 
-# Add alias to entity
-entity = await service.add_alias(
-    canonical_name: str,
-    alias: str
-) -> Entity
+await mcp_client.call_tool("entity", {
+    "operation": "merge",
+    "from_canonical": "Jeffrey Harrell",  # Misspelled
+    "to_canonical": "Jeffery Harrell"     # Correct
+})
 
-# Resolve name to canonical
-canonical = await service.resolve_canonical_name(
-    name: str
-) -> str | None
-
-# List all entities
-entities = await service.list_entities() -> list[Entity]
+await mcp_client.call_tool("entity", {"operation": "list"})
+await mcp_client.call_tool("entity", {"operation": "show", "name": "Jeffery Harrell"})
 ```
 
 **Key Objects:**
-- `Entity`: Has `canonical_name` and `aliases` (PostgreSQL array)
+- `NameIndex`: Simple mapping table with `name` and `canonical_name` fields
 
 #### ContextService (`context_service.py`)
 Manages biography, continuity messages, and context blocks.
@@ -473,7 +473,7 @@ related = await engine.get_splash_memories(
 
 Key SQLAlchemy models:
 - `Memory`: Core memory storage with embeddings and marginalia
-- `Entity`: Canonical entities with aliases
+- `NameIndex`: Simple name to canonical name mapping (replaced Entity)
 - `Knowledge`: Structured knowledge documents
 - `IdentityFact`: Identity chronicle entries
 - `PersonalityDirective`: Behavioral instructions
@@ -571,6 +571,7 @@ await mcp_client.call_tool("browse", {"interval": "yesterday", "text": "debuggin
 - **Test data**: Pre-populated from `.local/test_dataset.dump.gz` via production backup/restore
 - **Module isolation**: Each test module gets a fresh database restore
 - **Connection handling**: Tests terminate active connections before dropping database
+- **Robustness**: Tests handle real-world LLM inconsistencies (e.g., entity extraction)
 
 ## Gotchas and Solutions
 
@@ -612,6 +613,11 @@ Pendulum doesn't parse ISO durations directly. We have a custom parser in `inter
 - "database is being accessed by other users" - Terminate connections first with pg_terminate_backend
 - Use the patterns in `tests/e2e/conftest.py` for proper database reset
 
+#### Entity Extraction Inconsistency
+- Small Helper models (like gemma3:4b) may inconsistently extract entity names
+- Tests should handle this gracefully rather than assuming perfect extraction
+- See `test_entity_affects_search` for robust pattern that handles both success and partial success
+
 ## Quick Tool Reference
 
 ### Most Used Tools
@@ -622,7 +628,10 @@ Pendulum doesn't parse ISO durations directly. We have a custom parser in `inter
 - `create_knowledge --slug "..." --content "..."`: Create wiki entry
 - `get_knowledge --slug "..."`: Retrieve knowledge document
 - `list_knowledge`: List all knowledge documents
-- `add_alias --canonical_name "..." --alias "..."`: Add entity alias
+- `entity --operation set-alias --name "..." --canonical "..."`: Set entity alias
+- `entity --operation merge --from-canonical "..." --to-canonical "..."`: Merge entities
+- `entity --operation list`: List all canonical names
+- `entity --operation show --name "..."`: Show entity details
 - `find_clusters --query "..."`: Find memory clusters
 
 ## Environment Variables

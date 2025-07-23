@@ -1,0 +1,7 @@
+## Entity Index
+
+{{ total }} canonical {{ 'name' if total == 1 else 'names' }} registered:
+
+{% for entity in entities -%}
+- **{{ entity.canonical_name }}** ({{ entity.alias_count }} {{ 'entry' if entity.alias_count == 1 else 'entries' }})
+{% endfor %}

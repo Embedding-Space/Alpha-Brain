@@ -120,6 +120,10 @@ def reset_test_database():
     # Note: pg_restore may return warnings (exit code 1) even on success, so we use || true
     # If there's a real error, the database operations will fail and tests will catch it
     
+    # Note: The real issue is that test-migrate runs BEFORE the restore,
+    # but the restore wipes out the new tables. We need a different approach.
+    # For now, we'll create a new test dataset that includes the current schema.
+    
     yield  # Run the tests in the module
     
     # No cleanup needed - next module will reset

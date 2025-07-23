@@ -62,9 +62,10 @@ async def test_find_and_get_clusters(mcp_client):
 async def test_find_clusters_with_filters(mcp_client):
     """Can we filter clusters by entity and time?"""
     # Add an alias for testing
-    await mcp_client.call_tool("add_alias", {
-        "canonical_name": "Test User 42",
-        "alias": "TU42"
+    await mcp_client.call_tool("entity", {
+        "operation": "set-alias",
+        "name": "TU42",
+        "canonical": "Test User 42"
     })
     
     # Create memories with the test entity

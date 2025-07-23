@@ -1,0 +1,20 @@
+{% if not found -%}
+{{ message }}
+{%- else -%}
+## {{ canonical }}
+
+{% if is_canonical -%}
+This is the canonical name.
+{%- else -%}
+"{{ name }}" is an alias for "{{ canonical }}".
+{%- endif %}
+
+{% if aliases|length > 0 -%}
+**Aliases:**
+{% for alias in aliases -%}
+- {{ alias }}
+{% endfor %}
+{%- else -%}
+No aliases registered.
+{%- endif %}
+{%- endif %}

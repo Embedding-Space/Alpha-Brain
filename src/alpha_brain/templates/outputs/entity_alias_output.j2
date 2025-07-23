@@ -1,0 +1,9 @@
+{% if operation == "created" -%}
+✓ Created new alias mapping:
+  {{ name }} → {{ canonical }}
+{%- else -%}
+✓ Updated alias mapping:
+  {{ name }} → {{ canonical }}
+{%- endif %}
+
+{{ message }}
