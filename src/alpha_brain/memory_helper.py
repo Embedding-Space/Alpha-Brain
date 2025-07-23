@@ -178,7 +178,7 @@ class MemoryHelper:
                 metadata.unknown_entities = canonicalization_result["unknown_entities"]
 
                 logger.info(
-                    "CANONICALIZATION COMPLETE",
+                    "Canonicalization complete",
                     extracted=len(extracted_names),
                     canonical=len(metadata.entities),
                     unknown_count=len(metadata.unknown_entities),

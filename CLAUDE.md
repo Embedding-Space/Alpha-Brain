@@ -37,7 +37,7 @@ The system maintains canonical entity names with aliases for consistent resoluti
 Alpha Brain now includes comprehensive identity management:
 
 - **Context Service**: Manages biography, continuity messages, and context blocks with TTL
-- **Identity Service**: Chronicle of becoming - timestamped facts with temporal precision
+- **Identity Service**: Timestamped facts with temporal precision
 - **Personality Service**: Mutable behavioral directives with weights and categories
 - **Location Service**: Geo-IP based location for spatial grounding
 - **Time Service**: Human-readable datetime formatting with day names
@@ -167,7 +167,7 @@ just clean-cache # Clean Python cache files
 - **FastMCP logging**: Server-side logging with Context parameter for debugging
 - **Identity management**: `whoami` tool with full context loading
 - **Context blocks**: Biography, continuity messages, and custom blocks with TTL
-- **Identity facts**: Chronicle of becoming with temporal precision (era/year/month/day/datetime)
+- **Identity facts**: Timeline with temporal precision (era/year/month/day/datetime)
 - **Personality directives**: Mutable behavioral instructions with weights and categories
 
 ### What's Next (TODOs)
@@ -335,7 +335,7 @@ blocks = await service.get_all_context_blocks() -> list[ContextBlock]
 ```
 
 #### IdentityService (`identity_service.py`)
-Chronicle of becoming - manages identity facts with temporal precision.
+Manages identity facts with temporal precision.
 
 ```python
 # Get the singleton

@@ -100,8 +100,75 @@ async def init_db():
                 "CREATE INDEX IF NOT EXISTS idx_context_expires ON context(expires_at) WHERE expires_at IS NOT NULL"
             )
         )
+        
+        # Add full-text search infrastructure
+        logger.info("Setting up full-text search...")
+        
+        # Add search_vector to memories table
+        await conn.execute(text("""
+            ALTER TABLE memories ADD COLUMN IF NOT EXISTS search_vector tsvector;
+        """))
+        
+        # Create GIN index for fast full-text search on memories
+        await conn.execute(text("""
+            CREATE INDEX IF NOT EXISTS idx_memories_search_vector 
+            ON memories USING GIN (search_vector);
+        """))
+        
+        # Create trigger function to automatically update search_vector
+        await conn.execute(text("""
+            CREATE OR REPLACE FUNCTION update_memories_search_vector()
+            RETURNS trigger AS $$
+            BEGIN
+                NEW.search_vector := to_tsvector('english', NEW.content);
+                RETURN NEW;
+            END;
+            $$ LANGUAGE plpgsql;
+        """))
+        
+        # Create trigger to update search_vector on insert/update
+        await conn.execute(text("""
+            DROP TRIGGER IF EXISTS memories_search_vector_trigger ON memories;
+            CREATE TRIGGER memories_search_vector_trigger
+            BEFORE INSERT OR UPDATE OF content ON memories
+            FOR EACH ROW
+            EXECUTE FUNCTION update_memories_search_vector();
+        """))
+        
+        # Add search_vector to knowledge table
+        await conn.execute(text("""
+            ALTER TABLE knowledge ADD COLUMN IF NOT EXISTS search_vector tsvector;
+        """))
+        
+        # Create GIN index for fast full-text search on knowledge
+        await conn.execute(text("""
+            CREATE INDEX IF NOT EXISTS idx_knowledge_search_vector 
+            ON knowledge USING GIN (search_vector);
+        """))
+        
+        # Create trigger function for knowledge
+        await conn.execute(text("""
+            CREATE OR REPLACE FUNCTION update_knowledge_search_vector()
+            RETURNS trigger AS $$
+            BEGIN
+                NEW.search_vector := to_tsvector('english', 
+                    COALESCE(NEW.title, '') || ' ' || COALESCE(NEW.content, '')
+                );
+                RETURN NEW;
+            END;
+            $$ LANGUAGE plpgsql;
+        """))
+        
+        # Create trigger for knowledge
+        await conn.execute(text("""
+            DROP TRIGGER IF EXISTS knowledge_search_vector_trigger ON knowledge;
+            CREATE TRIGGER knowledge_search_vector_trigger
+            BEFORE INSERT OR UPDATE OF title, content ON knowledge
+            FOR EACH ROW
+            EXECUTE FUNCTION update_knowledge_search_vector();
+        """))
 
-    logger.info("Database initialized")
+    logger.info("Database initialized with full-text search support")
 
 
 async def close_db():

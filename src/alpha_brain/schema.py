@@ -172,10 +172,6 @@ class Entity(Base):
     # Entity metadata
     entity_type = Column(String)  # 'person', 'place', 'project', 'company', 'cat', etc.
     description = Column(Text)  # Brief description for whois tool
-    
-    # Tracking when we first/last saw this entity
-    first_seen = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
-    last_seen = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
 
 
 class EntityInput(BaseModel):

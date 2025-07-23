@@ -211,6 +211,23 @@ def parse_tool_args(tool, args: list[str]) -> dict[str, Any]:
                 elif prop_type == "object":
                     # Try to parse as JSON object
                     value = json.loads(value)
+                else:
+                    # For anyOf types (e.g., str | None, int | None), try to infer
+                    if "anyOf" in prop_def:
+                        # Check if one of the types is integer or number
+                        types = [t.get("type") for t in prop_def["anyOf"] if "type" in t]
+                        if "integer" in types:
+                            try:
+                                value = int(value)
+                            except ValueError:
+                                # Not an integer, keep as string
+                                pass
+                        elif "number" in types:
+                            try:
+                                value = float(value)
+                            except ValueError:
+                                # Not a number, keep as string
+                                pass
                 # string stays as is
             except (ValueError, json.JSONDecodeError):
                 console.print(f"[red]Error:[/red] Invalid value for '--{arg_name}' (expected {prop_type})")

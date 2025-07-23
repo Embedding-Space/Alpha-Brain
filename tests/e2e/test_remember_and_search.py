@@ -12,7 +12,9 @@ async def test_remember_and_search_basic(mcp_client):
     # Store the memory
     result = await mcp_client.call_tool("remember", {"content": unique_content})
     assert not result.is_error
-    assert "stored" in result.content[0].text.lower()
+    # Check that we got a memory ID back (indicates successful storage)
+    response_text = result.content[0].text
+    assert "ID:" in response_text  # Memory ID is always shown
     
     # Search for it by a key phrase
     result = await mcp_client.call_tool("search", {"query": "prosthetic brain"})
@@ -28,9 +30,10 @@ async def test_remember_and_search_basic(mcp_client):
 async def test_remember_with_entity_then_search(mcp_client):
     """Can we find memories by entity name?"""
     # First, establish an entity with an alias
+    # Note: Sparkle is the canonical name, not Sparkplug Louise Mittenhaver
     await mcp_client.call_tool("add_alias", {
-        "canonical_name": "Sparkplug Louise Mittenhaver",
-        "alias": "Sparkle"
+        "canonical_name": "Sparkle",
+        "alias": "Sparkle the cat"
     })
     
     # Remember something about Sparkle

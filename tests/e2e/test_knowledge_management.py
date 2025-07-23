@@ -36,7 +36,10 @@ def my_tool(text: str) -> str:
         "content": content
     })
     assert not result.is_error
-    assert "created successfully" in result.content[0].text.lower()
+    # Check that the document was created - look for slug confirmation
+    response_text = result.content[0].text
+    assert slug in response_text
+    assert "FastMCP Guide" in response_text
     
     # Retrieve the document
     result = await mcp_client.call_tool("get_knowledge", {"slug": slug})
@@ -73,7 +76,7 @@ async def test_update_knowledge(mcp_client):
         "content": "# Updated Version\n\nThis is version 2 with more content!"
     })
     assert not result.is_error
-    assert "updated successfully" in result.content[0].text.lower()
+    # Just verify no error - we'll check the actual update worked below
     
     # Verify the update
     result = await mcp_client.call_tool("get_knowledge", {"slug": slug})

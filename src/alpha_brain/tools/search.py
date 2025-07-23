@@ -150,7 +150,6 @@ async def search(ctx: Context, query: str | None = None, limit: int = 10, interv
                 "aliases": entity.aliases,
                 "entity_type": entity.entity_type,
                 "description": entity.description,
-                "first_seen": TimeService.format_for_context(entity.first_seen),
             }
     
     # Wall 2: Check for knowledge matches (title first, then full-text)
