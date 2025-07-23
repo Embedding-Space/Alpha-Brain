@@ -20,4 +20,4 @@ wheels/
 canonical_names.local.json
 
 # Backup files
-backup-*.sql.gz
+backup-*.dump.gz

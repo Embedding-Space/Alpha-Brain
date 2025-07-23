@@ -111,15 +111,45 @@ clean-cache:
     @find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
     @find . -type f -name "*.pyc" -delete 2>/dev/null || true
 
-# Backup production database
+# Backup production database (pgvector-aware)
 backup:
-    @echo "💾 Creating backup..."
-    @docker compose exec -T postgres pg_dump -U alpha -d alpha_brain | gzip > "backup-$(date +%Y%m%d-%H%M%S).sql.gz"
-    @echo "✅ Backup saved!"
+    @echo "💾 Creating backup with pgvector support..."
+    @docker compose exec -T postgres pg_dump -U alpha -d alpha_brain -Fc -f /tmp/backup.dump
+    @docker compose exec -T postgres cat /tmp/backup.dump | gzip > "backup-$(date +%Y%m%d-%H%M%S).dump.gz"
+    @docker compose exec -T postgres rm /tmp/backup.dump
+    @echo "✅ Backup saved in custom format!"
 
-# Restore production database
+# Restore production database (pgvector-aware)
 restore backup_file:
     @echo "⚠️  This will overwrite the production database! Continue? (y/N)"
     @read -r response && [[ "$$response" =~ ^[Yy]$$ ]] || exit 0
-    @gunzip -c "{{backup_file}}" | docker compose exec -T postgres psql -U alpha -d alpha_brain
-    @echo "✅ Restored from {{backup_file}}"
+    @echo "🔄 Preparing restore..."
+    # Drop and recreate database to ensure clean state
+    @docker compose exec -T postgres psql -U alpha -d postgres -c "DROP DATABASE IF EXISTS alpha_brain;"
+    @docker compose exec -T postgres psql -U alpha -d postgres -c "CREATE DATABASE alpha_brain;"
+    # Create vector extension BEFORE restore
+    @docker compose exec -T postgres psql -U alpha -d alpha_brain -c "CREATE EXTENSION IF NOT EXISTS vector;"
+    # Restore the data
+    @gunzip -c "{{backup_file}}" | docker compose exec -T postgres pg_restore -U alpha -d alpha_brain -Fc --if-exists --clean --no-owner
+    @echo "✅ Database restored successfully!"
+
+# Create a clean dump for test data (no memories, just schema + entities)
+create-test-dataset:
+    @echo "🧪 Creating clean test dataset..."
+    # Dump schema and specific tables only (no memories)
+    @docker compose exec -T postgres pg_dump -U alpha -d alpha_brain \
+        --schema-only \
+        --no-owner \
+        --no-privileges \
+        > .local/test_dataset_schema.sql
+    # Append entity data
+    @docker compose exec -T postgres pg_dump -U alpha -d alpha_brain \
+        --data-only \
+        --no-owner \
+        --table=entities \
+        --table=context \
+        --table=identity_facts \
+        --table=knowledge \
+        >> .local/test_dataset_schema.sql
+    @mv .local/test_dataset_schema.sql .local/test_dataset.sql
+    @echo "✅ Test dataset created!"
