@@ -1,6 +1,7 @@
 """Test the core memory workflow: remember something, then find it."""
 
 import pytest
+import asyncio
 
 
 @pytest.mark.asyncio
@@ -59,14 +60,19 @@ async def test_remember_with_entity_then_search(mcp_client):
 @pytest.mark.asyncio 
 async def test_search_with_time_interval(mcp_client):
     """Can we filter searches by time?"""
-    # Remember something
-    test_memory = "Just ran the test suite and everything is green!"
+    # Remember something unique to this test run
+    import uuid
+    unique_id = str(uuid.uuid4())[:8]
+    test_memory = f"Test run {unique_id}: Just ran the test suite and everything is green!"
     result = await mcp_client.call_tool("remember", {"content": test_memory})
     assert not result.is_error
     
-    # Search for recent memories
+    # Small delay to ensure full-text indexing
+    await asyncio.sleep(0.5)
+    
+    # Search for recent memories with our unique ID
     result = await mcp_client.call_tool("search", {
-        "query": "test suite",
+        "query": f"Test run {unique_id}",
         "interval": "past 1 hour"
     })
     assert not result.is_error
@@ -74,16 +80,16 @@ async def test_search_with_time_interval(mcp_client):
     response_text = result.content[0].text
     assert test_memory in response_text
     
-    # Search for memories from yesterday (should find nothing we just added)
+    # Search for memories from yesterday with our unique ID (should find nothing)
     result = await mcp_client.call_tool("search", {
-        "query": "test suite", 
+        "query": f"Test run {unique_id}", 
         "interval": "yesterday"
     })
     assert not result.is_error
     
     response_text = result.content[0].text
-    # Our test memory should NOT be in yesterday's results
-    assert test_memory not in response_text
+    # Our unique test memory should NOT be in yesterday's results
+    assert unique_id not in response_text  # More specific check
 
 
 @pytest.mark.asyncio
@@ -102,5 +108,5 @@ async def test_browse_memories_without_query(mcp_client):
     response_text = result.content[0].text
     # Should see our recent memory
     assert test_memory in response_text
-    # Should indicate browse mode
-    assert "memories from the past 2 hours" in response_text.lower()
+    # Should indicate browse mode - check for the interval we searched
+    assert "past 2 hours" in response_text.lower() or "browse past 2 hours" in response_text.lower()

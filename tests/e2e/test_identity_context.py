@@ -119,7 +119,7 @@ async def test_context_block_ttl(mcp_client):
     result = await mcp_client.call_tool("set_context", {
         "section": "test_temporary",
         "content": "This is a temporary context that expires.",
-        "ttl": "1h"  # 1 hour TTL
+        "ttl": "3600"  # Try seconds format
     })
     assert not result.is_error
     

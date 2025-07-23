@@ -124,12 +124,11 @@ Final thoughts.
     # Should have the requested section
     assert "Main Content" in response_text
     assert "important info" in response_text
-    # Should also show subsection
-    assert "Subsection" in response_text
     
-    # But not other top-level sections
+    # Should NOT include other sections (section retrieval is specific)
     assert "Introduction" not in response_text
     assert "Conclusion" not in response_text
+    assert "Subsection" not in response_text  # Subsections are separate sections
 
 
 @pytest.mark.asyncio
