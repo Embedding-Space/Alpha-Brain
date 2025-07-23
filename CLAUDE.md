@@ -28,13 +28,13 @@ Alpha Brain embraces the principle that **models write JSON and read prose**:
 The system maintains canonical entity names with aliases for consistent resolution:
 
 - **PostgreSQL arrays with GIN indexing** for efficient alias lookups
-- **Helper** (Llama 3.2) extracts entity names from prose and canonicalizes them
+- **Helper** (configurable local LLM, defaults to gemma3:4b) extracts entity names from prose and canonicalizes them
 - **Marginalia** field stores Helper's analysis including entities, keywords, and summaries
 - Example: "Jeff" → "Jeffery Harrell", "Sparkle" → "Sparkplug Louise Mittenhaver"
 
-### Identity & Context Management (NEW)
+### Identity & Context Management
 
-Alpha Brain now includes comprehensive identity management:
+Alpha Brain includes comprehensive identity management:
 
 - **Context Service**: Manages biography, continuity messages, and context blocks with TTL
 - **Identity Service**: Timestamped facts with temporal precision
@@ -58,7 +58,7 @@ just psql        # Connect to Postgres for debugging
 # Testing
 just test-up     # Start test containers (separate from main stack)
 just test        # Run E2E tests against test containers
-just test-one <test>  # Run single test (e.g., just test-one test_exact_search.py)
+just test-one tests/e2e/test_remember_and_search.py::test_search_with_time_interval  # Run single test
 just test-down   # Stop test containers
 just test-logs   # View test container logs
 
@@ -80,9 +80,9 @@ just dead        # Find unused code with Vulture
 just check       # Run ALL checks before committing (lint + dead + test)
 just validate    # Validate Python syntax and imports before Docker restart
 
-# Database operations
-just backup      # Creates timestamped .tar.gz with all data
-just restore <file>  # Restore from backup
+# Database operations (production-ready pgvector support)
+just backup      # Creates timestamped .dump.gz with pgvector support
+just restore <file>  # Restore from backup (handles pgvector properly)
 
 # Cleanup
 just clean       # Remove containers and volumes
@@ -120,18 +120,18 @@ just clean-cache # Clean Python cache files
 
 ### Memory Pipeline
 1. Prose input → Dual embeddings (semantic + emotional)
-2. Entity extraction and canonicalization via Helper (Llama 3.2)
+2. Entity extraction and canonicalization via Helper (local LLM)
 3. Store in Postgres with pgvector, including marginalia metadata
 4. Search returns memories with similarity scores and human-readable age
 5. Splash Engine provides associative memory resonance for serendipitous discovery
 6. Output templates format results with temporal grounding for AI models
 
-### Knowledge Pipeline (Implemented)
+### Knowledge Pipeline
 1. Write knowledge naturally in Markdown
 2. Parse to hierarchical JSON structure for storage using mistune
 3. Store in Postgres with structure preserved in JSONB column
 4. Retrieve full documents or specific sections by slug
-5. Unified search across both memories and knowledge (coming next)
+5. Unified search across both memories and knowledge
 
 ### Key Technical Choices
 - **FastMCP 2**: HTTP transport (not stdio) to avoid model instance proliferation
@@ -145,6 +145,12 @@ just clean-cache # Clean Python cache files
 - **Jinja2 Templates**: User-editable output formatting with temporal grounding
 - **Splash Engine**: Asymmetric similarity search for memory resonance (our killer feature)
 
+### Test Infrastructure (Dogfooding)
+- **Test data uses production backup/restore**: Same pgvector-aware mechanism as production
+- **Test database reset**: Each test module gets fresh database restore from `.local/test_dataset.dump.gz`
+- **Automatic connection handling**: Tests terminate active connections before dropping database
+- **Separate test containers**: Isolated test stack shares only embedding service with production
+
 ## Current Implementation State
 
 ### What Works
@@ -152,8 +158,7 @@ just clean-cache # Clean Python cache files
 - Vector similarity search (semantic, emotional, or both) with Splash Engine
 - **Exact text search** (case-insensitive ILIKE matching)
 - Entity extraction and canonicalization with alias resolution
-- E2E test infrastructure with separate test containers
-- Backup/restore workflow
+- **E2E test infrastructure with pgvector-aware backup/restore**
 - **Knowledge management**: Full CRUD operations for Markdown documents
 - **Markdown parsing**: Automatic structure extraction with sections and hierarchy
 - **Section retrieval**: Get specific sections by ID from knowledge documents
@@ -169,6 +174,7 @@ just clean-cache # Clean Python cache files
 - **Context blocks**: Biography, continuity messages, and custom blocks with TTL
 - **Identity facts**: Timeline with temporal precision (era/year/month/day/datetime)
 - **Personality directives**: Mutable behavioral instructions with weights and categories
+- **Memory clustering**: Find patterns in memories using HDBSCAN, DBSCAN, agglomerative, or k-means
 
 ### What's Next (TODOs)
 - Build unified search across memories and knowledge
@@ -365,19 +371,12 @@ Manages behavioral directives with weights and categories.
 from alpha_brain.personality_service import get_personality_service
 service = get_personality_service()
 
-# Add directive
-await service.add_directive(
-    instruction: str,
-    weight: float = 1.0,
-    category: str | None = None
-)
-
-# Update directive
-await service.update_directive(
-    directive_id: int,
-    instruction: str | None = None,
+# Set directive (create or update)
+await service.set_directive(
+    directive: str,
     weight: float | None = None,
-    category: str | None = None
+    category: str | None = None,
+    delete: bool = False
 )
 
 # Get all directives
@@ -386,17 +385,16 @@ directives = await service.get_all_directives() -> list[PersonalityDirective]
 
 ### Helper Services
 
-
 #### MemoryHelper (`memory_helper.py`)
-Extracts entities and metadata from memories.
+Extracts entities and metadata from memories using local LLM.
 
 ```python
 from alpha_brain.memory_helper import MemoryHelper
 helper = MemoryHelper()
 
 # Analyze memory content
-marginalia = await helper.analyze(content: str) -> dict
-# Returns: {"entities": [...], "importance": 1-5, "keywords": [...], "summary": "..."}
+marginalia = await helper.analyze_memory(content: str) -> MemoryMetadata
+# Returns: MemoryMetadata with entities, importance, keywords, summary
 ```
 
 #### SearchHelper (`search_helper.py`)
@@ -414,17 +412,18 @@ enhanced = await helper.analyze_query(query: str) -> SearchInterpretation
 ### Utility Services
 
 #### TimeService (`time_service.py`)
-Human-readable datetime formatting.
+Human-readable datetime formatting and duration parsing.
 
 ```python
-from alpha_brain.time_service import get_time_service
-service = get_time_service()
+from alpha_brain.time_service import TimeService
 
-# Get current time with formatting
-now = service.now()  # Returns TimeInfo object
-print(now.full)      # "Monday, January 22, 2025 at 8:45 AM CST"
-print(now.readable)  # "Jan 22 at 8:45 AM"
-print(now.age)       # "just now"
+# Static methods for formatting
+TimeService.format_full(dt)      # "Monday, January 22, 2025 at 8:45 AM CST"
+TimeService.format_readable(dt)  # "Jan 22 at 8:45 AM"
+TimeService.format_age(dt)       # "5 minutes ago"
+
+# Parse durations
+duration = TimeService.parse_duration("3h")  # Returns timedelta
 ```
 
 #### LocationService (`location_service.py`)
@@ -444,8 +443,8 @@ print(location.timezone)  # "America/Chicago"
 Asymmetric similarity search for memory resonance.
 
 ```python
-from alpha_brain.splash_engine import SplashEngine
-engine = SplashEngine()
+from alpha_brain.splash_engine import get_splash_engine
+engine = get_splash_engine()
 
 # Get related memories (our "killer feature")
 related = await engine.get_splash_memories(
@@ -540,16 +539,17 @@ memories = await service.search(
 - Tests simulate real user workflows through MCP tools, not individual functions
 - Testing mocks would test the mocks, not the actual system behavior
 - All tests live in `tests/e2e/` and require full services running
+- **Dogfooding**: Test infrastructure uses the same backup/restore mechanism as production
 
 ### Testing Pattern
 - E2E tests use FastMCP client against separate test containers
 - Test containers share embedding service but have isolated database
-- Tests automatically wait for healthy containers via `wait_for_mcp.py`
+- Tests automatically wait for healthy containers via health checks
 - Run tests with `just test` or single test with `just test-one <file>`
 - Tests focus on workflows: "user stores memory, then searches for it"
-- **Test data**: Pre-populated from `.local/test_dataset.sql` dump
+- **Test data**: Pre-populated from `.local/test_dataset.dump.gz` via production backup/restore
 - **Module isolation**: Each test module gets a fresh database restore
-- **Test fixtures**: Use conftest.py patterns for database state management
+- **Connection handling**: Tests terminate active connections before dropping database
 
 ## Gotchas and Solutions
 
@@ -586,6 +586,11 @@ FastMCP tools now require `ctx: Context` as the first parameter. Never provide a
 #### ISO 8601 Duration Parsing
 Pendulum doesn't parse ISO durations directly. We have a custom parser in `interval_parser.py` that handles common formats like "P3H", "P7D", etc.
 
+#### Test Database Reset Failures
+- "DROP DATABASE cannot run inside a transaction block" - Use separate DROP and CREATE commands
+- "database is being accessed by other users" - Terminate connections first with pg_terminate_backend
+- Use the patterns in `tests/e2e/conftest.py` for proper database reset
+
 ## Environment Variables
 
 Required:
@@ -595,6 +600,7 @@ Optional:
 - `OPENAI_BASE_URL`: For Ollama (defaults to host.docker.internal)
 - `OPENAI_API_KEY`: Not actually needed for Ollama
 - `EMBEDDING_SERVICE_URL`: For embedding microservice
+- `HELPER_MODEL`: LLM model for entity extraction (defaults to gemma3:4b)
 
 ## Development Workflow
 
