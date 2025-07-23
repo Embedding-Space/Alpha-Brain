@@ -30,7 +30,7 @@ The system maintains canonical entity names with aliases for consistent resoluti
 - **PostgreSQL arrays with GIN indexing** for efficient alias lookups
 - **Helper** (configurable local LLM, defaults to gemma3:4b) extracts entity names from prose and canonicalizes them
 - **Marginalia** field stores Helper's analysis including entities, keywords, and summaries
-- Example: "Jeff" → "Jeffery Harrell", "Sparkle" → "Sparkplug Louise Mittenhaver"
+- Example: "Jeff" → "Jeffery Harrell", "Sparkplug Louise Mittenhaver" → "Sparkle"
 
 ### Identity & Context Management
 
