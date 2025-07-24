@@ -118,7 +118,6 @@ async def whoami(token_budget: int = 8000) -> str:
     return render_output(
         "whoami",
         location=location,
-        user_name="Jeffery Harrell",      # TODO: From context or config
         biography=biography,
         identity_facts=identity_facts,
         personality_traits=personality_traits,
