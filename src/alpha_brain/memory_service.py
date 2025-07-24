@@ -11,7 +11,7 @@ import numpy as np
 import pendulum
 from sklearn.cluster import DBSCAN, HDBSCAN, AgglomerativeClustering, KMeans
 from sklearn.metrics.pairwise import cosine_similarity
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from structlog import get_logger
 
 from alpha_brain.database import get_db
@@ -34,6 +34,21 @@ async def canonicalize_entity_name(name: str) -> str:
         result = await session.execute(stmt)
         canonical = result.scalar_one_or_none()
         return canonical or name  # Return original if not found
+
+
+async def get_all_aliases(canonical_name: str) -> list[str]:
+    """Get all aliases for a canonical name, including the canonical name itself."""
+    async with get_db() as session:
+        # Find all names that map to this canonical name
+        stmt = select(NameIndex.name).where(NameIndex.canonical_name == canonical_name)
+        result = await session.execute(stmt)
+        aliases = [row.name for row in result]
+        
+        # Always include the canonical name itself
+        if canonical_name not in aliases:
+            aliases.append(canonical_name)
+            
+        return aliases
 
 
 class ClusterCandidate:
@@ -175,23 +190,10 @@ class MemoryService:
         try:
             logger.info("Analyzing memory")
             metadata = await self.memory_helper.analyze_memory(content)
-            
-            # Canonicalize all entity names using name index
-            all_entity_names = metadata.entities + metadata.unknown_entities
-            canonical_entities = []
-            unknown_entities = []
-            
-            for name in all_entity_names:
-                canonical = await canonicalize_entity_name(name)
-                if canonical != name:  # Found canonical mapping
-                    canonical_entities.append(canonical)
-                else:  # No mapping found, keep as unknown
-                    unknown_entities.append(name)
 
             # Convert to dict for storage
             metadata_dict = {
-                "entities": canonical_entities,  # Store canonical names
-                "unknown_entities": unknown_entities,  # Store unresolved names
+                "names": metadata.names,  # Store all names as-is
                 "importance": metadata.importance,
                 "keywords": metadata.keywords,
                 "summary": metadata.summary,
@@ -200,8 +202,7 @@ class MemoryService:
 
             logger.info(
                 "Memory analyzed",
-                canonical_count=len(canonical_entities),
-                unknown_count=len(unknown_entities),
+                name_count=len(metadata.names),
                 importance=metadata.importance,
             )
             return metadata_dict
@@ -350,14 +351,16 @@ class MemoryService:
                         end=end_dt.isoformat()
                     )
                 
-                # Canonicalize entity filter if provided
-                canonical_entity = None
+                # Get all aliases for entity filter if provided
+                entity_aliases = []
                 if entity:
                     canonical_entity = await canonicalize_entity_name(entity)
+                    entity_aliases = await get_all_aliases(canonical_entity)
                     logger.info(
-                        "Canonicalized entity",
+                        "Entity filter expanded",
                         input=entity,
-                        canonical=canonical_entity
+                        canonical=canonical_entity,
+                        aliases=entity_aliases
                     )
                 
                 # Determine sort order
@@ -390,13 +393,15 @@ class MemoryService:
                             Memory.created_at.between(start_dt, end_dt)
                         )
                     
-                    # Apply entity filter
-                    if canonical_entity:
-                        stmt = stmt.where(
-                            Memory.marginalia["entities"].op("@>")(
-                                [canonical_entity]
+                    # Apply entity filter - check if any alias is in names
+                    if entity_aliases:
+                        # Check if the names array contains any of the aliases
+                        conditions = []
+                        for alias in entity_aliases:
+                            conditions.append(
+                                Memory.marginalia["names"].op("@>")([alias])
                             )
-                        )
+                        stmt = stmt.where(or_(*conditions))
                     
                     # Apply ordering
                     if actual_order == "asc":
@@ -434,20 +439,21 @@ class MemoryService:
                     return memories
                 
                 # Search mode - continue with existing logic but add filters
-                # First, check for entity matches in marginalia
+                # First, check for name matches in marginalia
                 entity_matches = []
                 if search_type != "exact" and query:
-                    # Try to canonicalize the query - it might be an entity alias
-                    search_entity = await canonicalize_entity_name(query)
+                    # Get all aliases for the query
+                    query_canonical = await canonicalize_entity_name(query)
+                    query_aliases = await get_all_aliases(query_canonical)
                     
                     logger.info(
-                        "Entity search canonicalization",
+                        "Name search expansion",
                         query=query,
-                        canonical=search_entity
+                        canonical=query_canonical,
+                        aliases=query_aliases
                     )
                     
-                    # Look for the canonicalized entity in entities array
-                    # For unknown_entities, still use the original query
+                    # Look for any of the aliases in the names array
                     entity_stmt = (
                         select(
                             Memory.id,
@@ -456,10 +462,11 @@ class MemoryService:
                             Memory.marginalia,
                         )
                         .where(
-                            # Check if canonicalized name is in entities array
-                            # OR original query is in unknown_entities array
-                            (Memory.marginalia["entities"].op("@>")([search_entity]))
-                            | (Memory.marginalia["unknown_entities"].op("@>")([query]))
+                            # Check if any alias is in the names array
+                            or_(*[
+                                Memory.marginalia["names"].op("@>")([alias])
+                                for alias in query_aliases
+                            ])
                         )
                     )
                     
@@ -470,11 +477,12 @@ class MemoryService:
                         )
                     
                     # Apply entity filter (in addition to query match)
-                    if canonical_entity and canonical_entity != query:
+                    if entity_aliases and query_canonical not in entity_aliases:
                         entity_stmt = entity_stmt.where(
-                            Memory.marginalia["entities"].op("@>")(
-                                [canonical_entity]
-                            )
+                            or_(*[
+                                Memory.marginalia["names"].op("@>")([alias])
+                                for alias in entity_aliases
+                            ])
                         )
                     
                     entity_stmt = entity_stmt.order_by(Memory.created_at.desc()).limit(limit)
@@ -518,13 +526,15 @@ class MemoryService:
                             Memory.created_at.between(start_dt, end_dt)
                         )
                     
-                    # Apply entity filter
-                    if canonical_entity:
-                        stmt = stmt.where(
-                            Memory.marginalia["entities"].op("@>")(
-                                [canonical_entity]
+                    # Apply entity filter - check if any alias is in names
+                    if entity_aliases:
+                        # Check if the names array contains any of the aliases
+                        conditions = []
+                        for alias in entity_aliases:
+                            conditions.append(
+                                Memory.marginalia["names"].op("@>")([alias])
                             )
-                        )
+                        stmt = stmt.where(or_(*conditions))
                     
                     # Apply ordering based on actual_order
                     if actual_order == "asc":
@@ -568,12 +578,13 @@ class MemoryService:
                                 Memory.created_at.between(start_dt, end_dt)
                             )
                         
-                        # Apply entity filter
-                        if canonical_entity:
+                        # Apply entity filter - check if any alias is in names
+                        if entity_aliases:
                             stmt = stmt.where(
-                                Memory.marginalia["entities"].op("@>")(
-                                    [canonical_entity]
-                                )
+                                or_(*[
+                                    Memory.marginalia["names"].op("@>")([alias])
+                                    for alias in entity_aliases
+                                ])
                             )
 
                         stmt = stmt.order_by(
@@ -606,12 +617,13 @@ class MemoryService:
                                 Memory.created_at.between(start_dt, end_dt)
                             )
                         
-                        # Apply entity filter
-                        if canonical_entity:
+                        # Apply entity filter - check if any alias is in names
+                        if entity_aliases:
                             stmt = stmt.where(
-                                Memory.marginalia["entities"].op("@>")(
-                                    [canonical_entity]
-                                )
+                                or_(*[
+                                    Memory.marginalia["names"].op("@>")([alias])
+                                    for alias in entity_aliases
+                                ])
                             )
 
                         stmt = stmt.order_by(
@@ -654,12 +666,13 @@ class MemoryService:
                                 Memory.created_at.between(start_dt, end_dt)
                             )
                         
-                        # Apply entity filter
-                        if canonical_entity:
+                        # Apply entity filter - check if any alias is in names
+                        if entity_aliases:
                             stmt = stmt.where(
-                                Memory.marginalia["entities"].op("@>")(
-                                    [canonical_entity]
-                                )
+                                or_(*[
+                                    Memory.marginalia["names"].op("@>")([alias])
+                                    for alias in entity_aliases
+                                ])
                             )
 
                         stmt = stmt.order_by(avg_distance).limit(

@@ -18,12 +18,9 @@ logger = get_logger()
 class MemoryMetadata(BaseModel):
     """Rich metadata extracted from memory through sequential questions."""
 
-    # Canonical entities found in the memory
-    entities: list[str] = Field(
-        default_factory=list, description="Canonicalized entity names"
-    )
-    unknown_entities: list[str] = Field(
-        default_factory=list, description="Entity names that couldn't be canonicalized"
+    # Names found in the memory (people, places, organizations, etc.)
+    names: list[str] = Field(
+        default_factory=list, description="All names mentioned in the memory"
     )
 
     # Other metadata
@@ -161,7 +158,7 @@ class MemoryHelper:
                     )
                     # Continue with other questions
 
-            # Canonicalize the extracted names
+            # Store the extracted names
             logger.info(
                 "Names extraction result",
                 extracted_names=extracted_names,
@@ -169,23 +166,19 @@ class MemoryHelper:
             )
 
             if extracted_names:
-                # Store all extracted names as unknown_entities
-                # Canonicalization now happens in memory_service
-                metadata.entities = []
-                metadata.unknown_entities = extracted_names
+                metadata.names = extracted_names
 
                 logger.info(
-                    "Entity extraction complete",
+                    "Name extraction complete",
                     extracted=len(extracted_names),
-                    entities=extracted_names,
+                    names=extracted_names,
                 )
 
             elapsed = time.time() - start_time
             logger.info(
                 "memory_analyzed",
                 duration_seconds=elapsed,
-                entity_count=len(metadata.entities),
-                unknown_count=len(metadata.unknown_entities),
+                name_count=len(metadata.names),
                 importance=metadata.importance,
             )
 
@@ -220,8 +213,7 @@ if __name__ == "__main__":
 
         try:
             result = await helper.analyze_memory(test_content)
-            print(f"Canonical entities: {result.entities}")
-            print(f"Unknown entities: {result.unknown_entities}")
+            print(f"Names: {result.names}")
             print(f"Importance: {result.importance}")
             print(f"Keywords: {result.keywords}")
             print(f"Summary: {result.summary}")

@@ -4,7 +4,8 @@ version = "1.0.0"
 description = "Unified memory and knowledge system for AI agents with natural language interface"
 readme = "README.md"
 authors = [
-    { name = "Jeffery Harrell", email = "jefferyharrell@gmail.com" }
+    { name = "Jeffery Harrell", email = "jefferyharrell@gmail.com" },
+    { name = "Alpha", email = "jeffery.harrell+alpha@gmail.com" }
 ]
 requires-python = ">=3.13"
 dependencies = [

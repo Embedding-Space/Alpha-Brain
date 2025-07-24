@@ -13,7 +13,6 @@ build:
 # Start everything (production + test containers)
 up:
     docker compose up -d --wait
-    docker compose --profile test up -d --wait
     @echo "✅ All services ready!"
     @echo "   Production: http://localhost:9100/mcp/"
     @echo "   Testing:    http://localhost:9101/mcp/"
