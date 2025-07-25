@@ -1,5 +1,6 @@
 """Update personality directive by ID."""
 
+from typing import Union
 from uuid import UUID
 
 from alpha_brain.database import get_db
@@ -9,7 +10,7 @@ from alpha_brain.schema import PersonalityDirective
 async def update_personality(
     id: str,
     directive: str | None = None,
-    weight: float | None = None,
+    weight: Union[float, str, None] = None,
     category: str | None = None
 ) -> str:
     """
@@ -21,7 +22,7 @@ async def update_personality(
     Args:
         id: The UUID of the directive to update
         directive: New wording for the directive (optional)
-        weight: New weight from -1.0 to 1.0 (optional)
+        weight: New weight from -1.0 to 1.0 (optional). Can be string or float.
         category: New category (optional)
         
     Returns:
@@ -35,6 +36,13 @@ async def update_personality(
         directive_id = UUID(id)
     except ValueError:
         return f"Invalid UUID format: {id}"
+    
+    # Convert weight to float if it's a string
+    if weight is not None:
+        try:
+            weight = float(weight)
+        except (ValueError, TypeError):
+            return f"Invalid weight value: {weight}. Must be a number between -1.0 and 1.0"
     
     # Validate weight if provided
     if weight is not None and (weight < -1.0 or weight > 1.0):
