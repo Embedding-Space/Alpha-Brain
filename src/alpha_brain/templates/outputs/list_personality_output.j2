@@ -1,0 +1,16 @@
+Current time: {{ current_time | format_time_full }}
+
+# Personality Directives
+
+{% if categories %}
+{%- for category in categories %}
+## {{ category.name }}
+
+{% for directive in category.directives -%}
+- {{ directive.text }} [{{ "%.2f"|format(directive.weight) }}]
+  ID: {{ directive.id }}
+{% endfor %}
+{% endfor -%}
+{%- else %}
+No personality directives found.
+{%- endif %}

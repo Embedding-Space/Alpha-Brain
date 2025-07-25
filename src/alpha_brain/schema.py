@@ -15,6 +15,7 @@ from sqlalchemy import (
     DateTime,
     Integer,
     Interval,
+    REAL,
     String,
     Text,
     func,
@@ -226,7 +227,7 @@ class PersonalityDirective(Base):
     
     id = Column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
     directive = Column(Text, nullable=False, unique=True)  # The actual behavioral instruction
-    weight = Column(DECIMAL(precision=3, scale=2), nullable=False, default=1.0)  # 0.00 to 9.99
+    weight = Column(REAL, nullable=False, default=0.0)  # -1.0 to 1.0 (float32)
     category = Column(String)  # Optional grouping like "intellectual_engagement"
     
     created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))

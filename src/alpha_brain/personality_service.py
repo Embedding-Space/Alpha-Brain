@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from decimal import Decimal
 
 from sqlalchemy import select
 from structlog import get_logger
@@ -28,7 +27,7 @@ class PersonalityService:
         
         Args:
             directive: The behavioral instruction
-            weight: Importance weight (0.0 to 9.99)
+            weight: Importance weight (-1.0 to 1.0)
             category: Optional category for organization
             delete: If True, delete the directive
             
@@ -55,7 +54,7 @@ class PersonalityService:
             if existing:
                 # Update existing directive
                 if weight is not None:
-                    existing.weight = Decimal(str(weight))
+                    existing.weight = float(weight)
                 if category is not None:
                     existing.category = category if category else None
                     
@@ -78,7 +77,7 @@ class PersonalityService:
             # Create new directive
             new_directive = PersonalityDirective(
                 directive=directive,
-                weight=Decimal(str(weight)) if weight is not None else Decimal("1.0"),
+                weight=float(weight) if weight is not None else 0.0,
                 category=category if category else None
             )
 

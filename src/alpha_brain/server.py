@@ -16,11 +16,13 @@ from alpha_brain.tools import (
     get_memory,
     health_check,
     list_knowledge,
+    list_personality,
     remember,
     search,
     set_context,
     set_personality,
     update_knowledge,
+    update_personality,
     whoami,
 )
 
@@ -126,6 +128,8 @@ mcp.tool(list_knowledge)
 mcp.tool(set_context)
 mcp.tool(add_identity_fact)
 mcp.tool(set_personality)
+mcp.tool(list_personality)
+mcp.tool(update_personality)
 mcp.tool(whoami)
 
 

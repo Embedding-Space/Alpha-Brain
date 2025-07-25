@@ -10,11 +10,13 @@ from .get_knowledge import get_knowledge
 from .get_memory import get_memory
 from .health_check import health_check
 from .list_knowledge import list_knowledge
+from .list_personality import list_personality
 from .remember import remember
 from .search import search
 from .set_context import set_context
 from .set_personality import set_personality
 from .update_knowledge import update_knowledge
+from .update_personality import update_personality
 from .whoami import whoami
 
 __all__ = [
@@ -28,10 +30,12 @@ __all__ = [
     "get_memory",
     "health_check",
     "list_knowledge",
+    "list_personality",
     "remember",
     "search",
     "set_context",
     "set_personality",
     "update_knowledge",
+    "update_personality",
     "whoami",
 ]

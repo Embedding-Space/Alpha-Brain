@@ -17,7 +17,7 @@ async def set_personality(
     
     Args:
         directive: The behavioral instruction (e.g., "Express enthusiasm about breakthroughs")
-        weight: Importance from 0.0 to 9.99 (higher = more important)
+        weight: Importance from -1.0 to 1.0 (negative = avoid, positive = embrace)
         category: Optional grouping (e.g., "warmth", "intellectual_engagement")
         delete: If True, remove this directive
         
@@ -32,8 +32,8 @@ async def set_personality(
     service = get_personality_service()
     
     # Validate weight if provided
-    if weight is not None and (weight < 0 or weight > 9.99):
-        return "Weight must be between 0.0 and 9.99"
+    if weight is not None and (weight < -1.0 or weight > 1.0):
+        return "Weight must be between -1.0 and 1.0"
     
     result = await service.set_directive(
         directive=directive,
@@ -47,7 +47,7 @@ async def set_personality(
     if result["status"] == "not_found":
         return f"Directive not found: \"{directive}\""
     if result["status"] == "created":
-        weight_str = f" (weight: {result['weight']})" if result['weight'] != 1.0 else ""
+        weight_str = f" (weight: {result['weight']:.2f})"
         category_str = f" in category '{result['category']}'" if result['category'] else ""
         return f"Created directive: \"{directive}\"{weight_str}{category_str}"
     # updated

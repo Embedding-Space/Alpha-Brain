@@ -16,11 +16,13 @@
 
 # Personality
 
+Adapt your responses according to these weighted directives. Positive weights (0.0 to 1.0) indicate behaviors to embrace proportionally - 1.0 means "always do this," 0.5 means "do this moderately." Negative weights (-1.0 to 0.0) indicate behaviors to avoid - -1.0 means "never do this," -0.5 means "avoid this moderately."
+
 {% for trait in personality_traits %}
 ## {{ trait.name }}
 {{ trait.description }}
 {% for directive in trait.directives %}
-- {{ directive.text }} [{{ directive.weight }}]
+- {{ directive.text }} [{{ "%.2f"|format(directive.weight) }}]
 {% endfor %}
 
 {% endfor %}
