@@ -771,6 +771,38 @@ class MemoryService:
                 "Failed to get memory by ID", memory_id=str(memory_id), error=str(e)
             )
             return None
+    
+    async def get_all_with_embeddings(self, limit: int = 2500) -> list[Memory]:
+        """
+        Get all memories with their embeddings for visualization.
+        
+        Args:
+            limit: Maximum number of memories to return
+            
+        Returns:
+            List of Memory objects with embeddings
+        """
+        try:
+            async with get_db() as session:
+                stmt = (
+                    select(Memory)
+                    .order_by(Memory.created_at.desc())
+                    .limit(limit)
+                )
+                result = await session.execute(stmt)
+                memories = result.scalars().all()
+                
+                logger.info(
+                    "Retrieved memories for visualization",
+                    count=len(memories)
+                )
+                return memories
+        except Exception as e:
+            logger.error(
+                "Failed to get memories with embeddings",
+                error=str(e)
+            )
+            return []
 
     def _extract_embeddings(
         self,
