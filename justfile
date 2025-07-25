@@ -101,9 +101,9 @@ check:
 # === UTILITIES ===
 
 # Full cleanup - remove all containers and volumes
-clean: down
-    docker compose down -v
-    rm -rf .local/__pycache__
+# clean: down
+#     docker compose down -v
+#     rm -rf .local/__pycache__
 
 # Clear Python cache
 clean-cache:
