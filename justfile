@@ -123,6 +123,9 @@ restore backup_file:
     @echo "⚠️  This will overwrite the production database! Continue? (y/N)"
     @read -r response && [[ "$$response" =~ ^[Yy]$$ ]] || exit 0
     @echo "🔄 Preparing restore..."
+    # Terminate active connections to the database
+    @echo "🔌 Terminating active connections..."
+    @docker compose exec -T postgres psql -U alpha -d postgres -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = 'alpha_brain' AND pid <> pg_backend_pid();" > /dev/null 2>&1 || true
     # Drop and recreate database to ensure clean state
     @docker compose exec -T postgres psql -U alpha -d postgres -c "DROP DATABASE IF EXISTS alpha_brain;"
     @docker compose exec -T postgres psql -U alpha -d postgres -c "CREATE DATABASE alpha_brain;"
@@ -131,24 +134,22 @@ restore backup_file:
     # Restore the data
     @gunzip -c "{{backup_file}}" | docker compose exec -T postgres pg_restore -U alpha -d alpha_brain -Fc --if-exists --clean --no-owner
     @echo "✅ Database restored successfully!"
+    @echo "🔄 Restarting MCP server to reconnect..."
+    @docker compose restart alpha-brain-mcp
 
-# Create a clean dump for test data (no memories, just schema + entities)
-create-test-dataset:
-    @echo "🧪 Creating clean test dataset..."
-    # Dump schema and specific tables only (no memories)
-    @docker compose exec -T postgres pg_dump -U alpha -d alpha_brain \
-        --schema-only \
-        --no-owner \
-        --no-privileges \
-        > .local/test_dataset_schema.sql
-    # Append entity data
-    @docker compose exec -T postgres pg_dump -U alpha -d alpha_brain \
-        --data-only \
-        --no-owner \
-        --table=entities \
-        --table=context \
-        --table=identity_facts \
-        --table=knowledge \
-        >> .local/test_dataset_schema.sql
-    @mv .local/test_dataset_schema.sql .local/test_dataset.sql
-    @echo "✅ Test dataset created!"
+# Test a backup restore on a separate postgres instance (safe!)
+test-restore backup_file:
+    @echo "🧪 Testing backup restore on separate instance..."
+    @docker compose -f docker-compose.test-restore.yml up -d --wait
+    @echo "📦 Creating test database with pgvector..."
+    @docker exec alpha-brain-restore-test psql -U alpha -d postgres -c "DROP DATABASE IF EXISTS alpha_brain_restore_test;"
+    @docker exec alpha-brain-restore-test psql -U alpha -d postgres -c "CREATE DATABASE alpha_brain_restore_test;"
+    @docker exec alpha-brain-restore-test psql -U alpha -d alpha_brain_restore_test -c "CREATE EXTENSION IF NOT EXISTS vector;"
+    @echo "🔄 Restoring backup..."
+    @gunzip -c "{{backup_file}}" | docker exec -i alpha-brain-restore-test pg_restore -U alpha -d alpha_brain_restore_test -Fc --if-exists --clean --no-owner
+    @echo "✅ Restore completed! Checking database..."
+    @docker exec alpha-brain-restore-test psql -U alpha -d alpha_brain_restore_test -c "SELECT COUNT(*) as memory_count FROM memories;"
+    @docker exec alpha-brain-restore-test psql -U alpha -d alpha_brain_restore_test -c "SELECT COUNT(*) as knowledge_count FROM knowledge;"
+    @echo "🧹 Cleaning up test instance..."
+    @docker compose -f docker-compose.test-restore.yml down
+    @echo "✅ Backup test complete - your backup is valid!"

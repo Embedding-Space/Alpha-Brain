@@ -1,0 +1,24 @@
+# Separate postgres instance for testing backup restores
+# This allows us to verify backups without touching production data
+
+services:
+  postgres-restore-test:
+    image: pgvector/pgvector:pg17
+    container_name: alpha-brain-restore-test
+    environment:
+      POSTGRES_USER: alpha
+      POSTGRES_PASSWORD: brain
+      POSTGRES_DB: alpha_brain_restore_test
+    volumes:
+      - ./backups:/backups:ro  # Read-only access to backups
+    ports:
+      - "5432:5432"  # Different port to avoid conflicts
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U alpha -d alpha_brain_restore_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+networks:
+  default:
+    driver: bridge

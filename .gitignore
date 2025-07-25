@@ -21,3 +21,4 @@ canonical_names.local.json
 
 # Backup files
 backup-*.dump.gz
+backups/
