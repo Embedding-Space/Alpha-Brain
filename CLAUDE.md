@@ -87,6 +87,13 @@ just validate    # Validate Python syntax and imports before Docker restart
 just backup      # Creates timestamped .dump.gz with pgvector support
 just restore <file>  # Restore from backup (handles pgvector properly)
 
+# Automated backups (via Ofelia)
+# Hourly backups run automatically and are stored in ./backups/hourly/
+# 7-day retention with automatic cleanup
+# Check backup status:
+docker logs alpha-brain-ofelia --tail 20  # View recent backup runs
+ls -la backups/hourly/                    # List backup files
+
 # Cleanup
 just clean       # Remove containers and volumes
 just clean-cache # Clean Python cache files
@@ -108,6 +115,13 @@ just clean-cache # Clean Python cache files
 - Bind mounts for source code = instant reload with `just restart`
 - Alembic migrations run automatically before server starts
 - This avoids the "working on server while talking to server" pain
+
+### Backup Strategy
+- **Automated hourly backups** via Ofelia scheduler (cron for Docker)
+- **7-day retention** with automatic cleanup of old backups
+- **pgvector-aware dumps** using pg_dump custom format with gzip compression
+- **Bind-mounted backup directory** at `./backups` for external backup services
+- **Configuration**: `ofelia.ini` defines backup schedule and retention
 
 ### Package Structure
 - `src/alpha_brain/` at root, Docker copies to `/app/src/alpha_brain/`
@@ -190,13 +204,14 @@ Results are deduplicated across all categories, providing truly unified search.
 - **Identity management**: `whoami` tool with full context loading
 - **Context blocks**: Biography, continuity messages, and custom blocks with TTL
 - **Identity facts**: Timeline with temporal precision (era/year/month/day/datetime)
-- **Personality directives**: Mutable behavioral instructions with weights and categories
+- **Personality directives**: Mutable behavioral instructions with weights (-1.0 to 1.0)
 - **Memory clustering**: Find patterns in memories using HDBSCAN, DBSCAN, agglomerative, or k-means
 - **Browse tool**: Chronological memory viewing with interval-based browsing and multiple filter options
+- **Automated backups**: Hourly database backups with Ofelia scheduler (7-day retention)
+- **Personality updates**: Modify directive wording and weights by UUID
 
 ### What's Next (TODOs)
 - Add "crystallize" function to extract knowledge from memories
-- Import canonical entities from JSON file via MCP tool
 - Add pagination support (offset parameter) for large result sets
 - Create OOBE (out-of-box experience) tests for fresh install
 - Implement user_name configuration (currently hard-coded as "Jeffery Harrell")
@@ -387,14 +402,27 @@ service = get_personality_service()
 # Set directive (create or update)
 await service.set_directive(
     directive: str,
-    weight: float | None = None,
+    weight: float | None = None,    # Range: -1.0 to 1.0
     category: str | None = None,
     delete: bool = False
+)
+
+# Update existing directive by ID
+await service.update_directive(
+    directive_id: str,              # UUID
+    directive: str | None = None,
+    weight: float | None = None,
+    category: str | None = None
 )
 
 # Get all directives
 directives = await service.get_all_directives() -> list[PersonalityDirective]
 ```
+
+**Weight System**: 
+- Positive weights (0.0 to 1.0): Behaviors to embrace proportionally
+- Negative weights (-1.0 to 0.0): Behaviors to avoid
+- Uses REAL (float32) column type matching neural network architecture
 
 ### Helper Services
 
@@ -618,6 +646,19 @@ Pendulum doesn't parse ISO durations directly. We have a custom parser in `inter
 - Tests should handle this gracefully rather than assuming perfect extraction
 - See `test_entity_affects_search` for robust pattern that handles both success and partial success
 
+#### Ofelia Backup Configuration
+- Use `job-exec` with `user = postgres` to run backup commands
+- Avoid complex shell escaping - use simple `sh -c` with single quotes
+- Container name in config must match docker-compose service name
+- Example working config:
+  ```ini
+  [job-exec "hourly-backup"]
+  schedule = @hourly
+  container = alpha-brain-postgres
+  user = postgres
+  command = sh -c 'pg_dump -U alpha -d alpha_brain -Fc | gzip > /backups/hourly/alpha-brain-$(date +%Y%m%d-%H%M%S).dump.gz'
+  ```
+
 ## Quick Tool Reference
 
 ### Most Used Tools
@@ -633,6 +674,9 @@ Pendulum doesn't parse ISO durations directly. We have a custom parser in `inter
 - `entity --operation list`: List all canonical names
 - `entity --operation show --name "..."`: Show entity details
 - `find_clusters --query "..."`: Find memory clusters
+- `set_personality --directive "..." --weight ... --category "..."`: Add personality directive
+- `list_personality [--category "..."]`: List personality directives with UUIDs
+- `update_personality --id "..." [--directive "..."] [--weight ...] [--category "..."]`: Update directive
 
 ## Environment Variables
 
@@ -733,10 +777,15 @@ This principle extends to all AI interactions in Alpha Brain. We build systems t
 To import canonical entity names from a JSON file:
 
 ```bash
-# View generated docker commands (dry run)
-uv run alpha-brain import-entities canonical_names.local.json
+# Using the import script
+uv run python scripts/import_entities.py canonical_names.local.json
 
-# Copy the docker commands and execute them to import
+# Or after installing with uv sync
+uv run import-entities canonical_names.local.json
+
+# Default (uses .local/canonical_names.local.json if exists)
+uv run python scripts/import_entities.py
+
 # Example format in canonical_names.example.json
 ```
 
