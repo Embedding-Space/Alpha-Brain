@@ -1,7 +1,7 @@
 """Change personality weights to float32 with -1 to 1 range
 
 Revision ID: 82a2ea345f7a
-Revises: cad220075505
+Revises: 7a8b9c0d1e2f
 Create Date: 2025-07-25 09:24:37.500310
 
 """
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = '82a2ea345f7a'
-down_revision: Union[str, Sequence[str], None] = 'cad220075505'
+down_revision: Union[str, Sequence[str], None] = '7a8b9c0d1e2f'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
